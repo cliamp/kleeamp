@@ -173,6 +173,7 @@ internal fun PortraitPlayer(
         ) {
             BackChevron(actions.onBack)
             Spacer(Modifier.weight(1f))
+            LyricsButton(actions.onOpenLyrics)
             UpNextButton(model.upNextCount, actions.onOpenUpNext)
         }
         Spacer(Modifier.height(8.dp))
@@ -293,6 +294,7 @@ internal fun LandscapePlayer(
             ) {
                 BackChevron(actions.onBack)
                 Spacer(Modifier.weight(1f))
+                LyricsButton(actions.onOpenLyrics)
                 UpNextButton(model.upNextCount, actions.onOpenUpNext)
             }
             PlayerMeta(model)

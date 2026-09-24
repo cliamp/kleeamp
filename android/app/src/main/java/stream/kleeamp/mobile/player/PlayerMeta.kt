@@ -101,6 +101,32 @@ import stream.kleeamp.mobile.model.NowPlaying
 
 /** Compact outlined header control, with a full-height touch target. */
 @Composable
+internal fun LyricsButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val p = LocalPalette.current
+    Box(
+        modifier
+            .height(48.dp)
+            .semantics { role = Role.Button }
+            .microPress(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            Modifier
+                .border(1.dp, p.chipBorder, RoundedCornerShape(KleeampShape.small))
+                .padding(horizontal = 10.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Mono("LYRICS", KleeampType.chip, p.ink, maxLines = 1)
+        }
+    }
+}
+
+/** Compact outlined header control, with a full-height touch target. */
+@Composable
 internal fun UpNextButton(
     count: Int,
     onClick: () -> Unit,

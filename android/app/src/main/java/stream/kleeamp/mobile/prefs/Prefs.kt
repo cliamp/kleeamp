@@ -89,6 +89,7 @@ class Prefs(private val context: Context) {
         val lastStation = stringPreferencesKey("last_station")
         val volume = floatPreferencesKey("volume")
         val speed = floatPreferencesKey("speed")
+        val lyricsOffset = intPreferencesKey("lyrics_offset")
         val lbToken = stringPreferencesKey("lb_token")
         val autoResume = booleanPreferencesKey("auto_resume")
         val autoDownload = booleanPreferencesKey("auto_download")
@@ -131,6 +132,10 @@ class Prefs(private val context: Context) {
     val volume: Flow<Float> = context.settingsStore.data.map { it[K.volume] ?: 1f }
     /** Playback speed multiplier, 0.5–2.0. Applied to every play. */
     val speed: Flow<Float> = context.settingsStore.data.map { (it[K.speed] ?: 1f).coerceIn(0.5f, 2f) }
+    /** Synced-lyrics offset in ms, ±10s like cliamp's `[`/`]` keys. */
+    val lyricsOffset: Flow<Int> = context.settingsStore.data.map {
+        (it[K.lyricsOffset] ?: 0).coerceIn(-10_000, 10_000)
+    }
 
     /** Podcasts subscribed-shows section as a grid. */
     val subsGrid: StateFlow<Boolean> = subsGridFlag.asStateFlow()
@@ -288,6 +293,7 @@ class Prefs(private val context: Context) {
     suspend fun setResumeLocal(v: Boolean) = put(K.resumeLocal, v)
     suspend fun setVolume(v: Float) = put(K.volume, v)
     suspend fun setSpeed(v: Float) = put(K.speed, v.coerceIn(0.5f, 2f))
+    suspend fun setLyricsOffset(v: Int) = put(K.lyricsOffset, v.coerceIn(-10_000, 10_000))
     suspend fun setSubsGrid(v: Boolean) {
         subsGridFlag.value = v
         put(K.subsGrid, v)

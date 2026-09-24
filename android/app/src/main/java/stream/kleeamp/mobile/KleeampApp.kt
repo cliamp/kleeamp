@@ -22,6 +22,7 @@ import stream.kleeamp.mobile.art.CoverIo
 import stream.kleeamp.mobile.library.LocalLibrary
 import stream.kleeamp.mobile.art.StationArtSource
 import stream.kleeamp.mobile.library.PlaylistStore
+import stream.kleeamp.mobile.lyrics.LyricsRepository
 import stream.kleeamp.mobile.podcasts.PodcastRepository
 import stream.kleeamp.mobile.radio.RadioBrowser
 import stream.kleeamp.mobile.radio.RadioRepository
@@ -73,6 +74,7 @@ class KleeampApp : Application() {
         )
     val downloads: DownloadStore by lazy { DownloadStore(this, prefs, appScope) }
     val scrobbler: Scrobbler by lazy { Scrobbler(this, prefs, appScope) }
+    val lyrics: LyricsRepository by lazy { LyricsRepository(this) }
     val providerRouter: ProviderRouter by lazy { ProviderRouter(ProviderRouter.defaults()) }
 
     /**

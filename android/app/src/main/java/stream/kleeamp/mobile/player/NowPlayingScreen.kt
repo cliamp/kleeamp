@@ -73,6 +73,8 @@ import stream.kleeamp.mobile.playback.AudioOutputs
 import stream.kleeamp.mobile.playback.OutputKind
 import stream.kleeamp.mobile.playback.PlaybackBus
 import stream.kleeamp.mobile.playback.PlayerState
+import stream.kleeamp.mobile.appViewModel
+import stream.kleeamp.mobile.lyrics.LyricsViewModel
 import stream.kleeamp.mobile.chrome.clock
 import stream.kleeamp.mobile.chrome.compact
 import stream.kleeamp.mobile.chrome.BackChevron
@@ -149,6 +151,7 @@ internal data class PlayerModel(
 internal data class PlayerActions(
     val onBack: () -> Unit,
     val onOpenUpNext: () -> Unit,
+    val onOpenLyrics: () -> Unit,
     val onToggleShuffle: () -> Unit,
     val onCycleSpeed: () -> Unit,
     val onOpenScope: () -> Unit,
@@ -170,6 +173,8 @@ fun NowPlayingScreen(
     onBack: () -> Unit,
 ) {
     var fullscreen by rememberSaveable { mutableStateOf(false) }
+    var lyricsOpen by rememberSaveable { mutableStateOf(false) }
+    val lyricsVm = appViewModel { app -> LyricsViewModel(app.player, app.prefs, app.lyrics) }
 
     val uiState by vm.state.collectAsState()
     // The meters read the live analyser straight off the bus in their frame
@@ -205,6 +210,7 @@ fun NowPlayingScreen(
     val actions = PlayerActions(
         onBack = onBack,
         onOpenUpNext = onOpenUpNext,
+        onOpenLyrics = { lyricsOpen = true },
         onToggleShuffle = { vm.player.toggleShuffle() },
         onCycleSpeed = { vm.onEvent(NowPlayingViewModel.Event.CycleSpeed) },
         onOpenScope = onOpenScope,
@@ -243,6 +249,10 @@ fun NowPlayingScreen(
 
         if (fullscreen) {
             FullscreenVisualizer(model) { fullscreen = false }
+        }
+
+        if (lyricsOpen) {
+            LyricsOverlay(vm = lyricsVm, onBack = { lyricsOpen = false })
         }
     }
 }

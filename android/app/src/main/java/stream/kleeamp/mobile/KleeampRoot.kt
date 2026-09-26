@@ -161,8 +161,9 @@ fun KleeampRoot(
     // backstack entry: the list stays composed underneath, so it shows
     // through the scrim instead of an empty page.
     var playerOpen by rememberSaveable { mutableStateOf(false) }
-    // Up Next and Scope stack over the player sheet and peel back to it:
-    // sheets underneath stay open in place, never close to reopen.
+    // Up Next and Scope stack over whatever opened them and peel back
+    // to exactly that: sheets underneath stay open in place, never close
+    // to reopen.
     var upNextOpen by rememberSaveable { mutableStateOf(false) }
     var scopeOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -303,10 +304,7 @@ fun KleeampRoot(
                 reconnecting = reconnect,
                 hasPrev = playerState.hasPrev,
                 hasNext = playerState.hasNext,
-                onOpenUpNext = {
-                    playerOpen = true
-                    upNextOpen = true
-                },
+                onOpenUpNext = { upNextOpen = true },
                 onOpen = { playerOpen = true },
             )
 
@@ -693,10 +691,7 @@ fun KleeampRoot(
             NowPlayingSheet(
                 vm = appViewModel { app -> NowPlayingViewModel(app.player, app.prefs) },
                 onOpenScope = { scopeOpen = true },
-                onOpenUpNext = {
-                    playerOpen = true
-                    upNextOpen = true
-                },
+                onOpenUpNext = { upNextOpen = true },
                 onDismiss = { playerOpen = false },
             )
         }

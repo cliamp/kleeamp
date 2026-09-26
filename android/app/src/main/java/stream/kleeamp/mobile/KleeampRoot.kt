@@ -71,7 +71,7 @@ import stream.kleeamp.mobile.library.LibraryScreen
 import stream.kleeamp.mobile.podcasts.PodcastShowScreen
 import stream.kleeamp.mobile.podcasts.PodcastsScreen
 import stream.kleeamp.mobile.player.UpNextSheet
-import stream.kleeamp.mobile.player.ScopeScreen
+import stream.kleeamp.mobile.player.ScopeSheet
 import stream.kleeamp.mobile.settings.ScrobbleWizard as ScrobbleWizardScreen
 import stream.kleeamp.mobile.servers.ProviderCatalog
 import stream.kleeamp.mobile.servers.ProviderStore
@@ -159,13 +159,12 @@ fun KleeampRoot(
     var favScope by rememberSaveable { mutableStateOf(FavScope.All) }
     // The expanded player is a bottom sheet driven by this flag, not a
     // backstack entry: the list stays composed underneath, so it shows
-    // through the scrim instead of an empty page. playerReturn reopens
-    // the sheet when back returns from Up Next or Scope opened inside it.
+    // through the scrim instead of an empty page.
     var playerOpen by rememberSaveable { mutableStateOf(false) }
-    var playerReturn by remember { mutableStateOf(false) }
-    // Up Next opens stacked over the player sheet, so its previous page
-    // is always Now Playing; back peels it back to the player.
+    // Up Next and Scope stack over the player sheet and peel back to it:
+    // sheets underneath stay open in place, never close to reopen.
     var upNextOpen by rememberSaveable { mutableStateOf(false) }
+    var scopeOpen by rememberSaveable { mutableStateOf(false) }
 
     // Playback-global state stays at the root: the chrome and every screen
     // read current/playing. Prefs, provider and progress flows are collected
@@ -576,23 +575,6 @@ fun KleeampRoot(
             }
 
             // -- Full overlay destinations (cover the chrome) --
-            composable<Scope> {
-                OverlayCover {
-                ScopeScreen(
-                    prefs = prefs,
-                    station = station,
-                    streamTitle = streamTitle,
-                    playing = playerState.playing,
-                    onBack = {
-                        navController.popBackStack()
-                        if (playerReturn) {
-                            playerReturn = false
-                            playerOpen = true
-                        }
-                    },
-                )
-                }
-            }
             composable<Settings> {
                 Box(contentModifier) {
                     SettingsScreen(
@@ -710,11 +692,7 @@ fun KleeampRoot(
         if (playerOpen) {
             NowPlayingSheet(
                 vm = appViewModel { app -> NowPlayingViewModel(app.player, app.prefs) },
-                onOpenScope = {
-                    playerReturn = true
-                    playerOpen = false
-                    navController.navigate(Scope)
-                },
+                onOpenScope = { scopeOpen = true },
                 onOpenUpNext = {
                     playerOpen = true
                     upNextOpen = true
@@ -732,6 +710,15 @@ fun KleeampRoot(
                     player.playUpNextEntry(index)
                 },
                 onDismiss = { upNextOpen = false },
+            )
+        }
+        if (scopeOpen) {
+            ScopeSheet(
+                prefs = prefs,
+                station = station,
+                streamTitle = streamTitle,
+                playing = playerState.playing,
+                onDismiss = { scopeOpen = false },
             )
         }
 

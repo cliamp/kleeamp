@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -164,7 +163,9 @@ internal fun PortraitPlayer(
     modifier: Modifier = Modifier,
 ) {
     val p = LocalPalette.current
-    Column(modifier.fillMaxSize().background(p.ground).statusBarsPadding().navigationBarsPadding()) {
+    // No status-bars padding here: the sheet's handle zone already sits
+    // below the status bar, and padding twice shrinks the art plate.
+    Column(modifier.fillMaxSize().background(p.ground).navigationBarsPadding()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = Gutter).height(48.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -256,7 +257,6 @@ internal fun LandscapePlayer(
         modifier
             .fillMaxSize()
             .background(p.ground)
-            .statusBarsPadding()
             .padding(start = Gutter, end = Gutter, top = 6.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

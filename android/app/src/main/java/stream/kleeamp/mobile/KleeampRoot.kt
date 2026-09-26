@@ -57,6 +57,7 @@ import stream.kleeamp.mobile.playback.PlaybackBus
 import stream.kleeamp.mobile.playback.PlayerConnection
 import stream.kleeamp.mobile.chrome.KleeampTabBar
 import stream.kleeamp.mobile.chrome.KleeampTabRail
+import stream.kleeamp.mobile.chrome.QueueConfirmHost
 import stream.kleeamp.mobile.player.MiniPlayer
 import stream.kleeamp.mobile.player.NowPlayingSheet
 import stream.kleeamp.mobile.chrome.Tab
@@ -743,6 +744,17 @@ fun KleeampRoot(
                 },
                 onDismiss = { playerOpen = false },
             )
+        }
+
+        // The queue-add confirmation, topmost and centered above the chrome:
+        // every menu "Add to Up Next" lands here since the swipe pill died
+        // with the swipe gesture. After the NavHost so opaque pages never
+        // cover it.
+        Box(
+            Modifier.align(Alignment.BottomCenter).padding(bottom = chromeBottom + 14.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            QueueConfirmHost()
         }
     }
 }

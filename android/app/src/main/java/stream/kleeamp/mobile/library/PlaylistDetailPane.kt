@@ -184,7 +184,6 @@ fun LibraryPlaylistPane(
                         playing = playing,
                         onPlay = onPlay,
                         onToggle = { vm.onEvent(PlaylistDetailViewModel.Event.ToggleMember(it)) },
-                        onAddToQueue = onAddToQueue,
                         onOpenMenu = { menuFor = it },
                         adding = adding,
                         onBeginAdd = { adding = true },
@@ -256,7 +255,6 @@ private fun PlaylistDetailShown(
     onToggle: (Station) -> Unit,
     adding: Boolean,
     onBeginAdd: () -> Unit = {},
-    onAddToQueue: (Station) -> Unit = {},
     onOpenMenu: (Station) -> Unit = {},
 ) {
     val p = LocalPalette.current
@@ -325,7 +323,6 @@ private fun PlaylistDetailShown(
                     leading = {
                         SongCover(s = s, current = current, playing = playing)
                     },
-                    onQueue = { onAddToQueue(s) },
                     trailing = {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,

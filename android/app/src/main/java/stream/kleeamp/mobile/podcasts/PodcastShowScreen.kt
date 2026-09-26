@@ -185,7 +185,6 @@ fun PodcastShowScreen(
                         dlState = dl,
                         downloadedBytes = fetched?.bytes ?: 0L,
                         onPlay = { onPlay(station, queue) },
-                        onQueue = { onAddToUpNext(station) },
                         onOpenMenu = { menuIndex = i },
                     )
                 }
@@ -316,7 +315,6 @@ private fun EpisodeRow(
     active: Boolean,
     playing: Boolean,
     onPlay: () -> Unit,
-    onQueue: () -> Unit = {},
     onOpenMenu: () -> Unit = {},
     dlState: DownloadState = DownloadState.Idle,
     downloadedBytes: Long = 0L,
@@ -328,7 +326,6 @@ private fun EpisodeRow(
         rail = active,
         onClick = onPlay,
         verticalPadding = 11.dp,
-        onQueue = onQueue,
         leading = {
             // The resolved station cover already falls back to the show's own
             // artwork when the episode has none (see toStation), so only a

@@ -86,7 +86,12 @@ class PlayerConnection(
     fun toggleShuffle() = queue.toggleShuffle()
     fun next() = queue.next()
     fun prev() = queue.prev()
-    fun addToUpNext(station: Station, at: Int = Int.MAX_VALUE) = queue.addToUpNext(station, at)
+    fun addToUpNext(station: Station, at: Int = Int.MAX_VALUE) {
+        queue.addToUpNext(station, at)
+        // Fires the root "Added to Up Next" pill. Play Next routes around
+        // this on purpose: it queues too, but under its own name.
+        PlaybackBus.publishQueued()
+    }
     fun playNext(station: Station) = queue.playNext(station)
     fun replaceUpNext(station: Station, from: List<Station>) = queue.replaceUpNext(station, from)
     fun removeFromUpNext(index: Int) = queue.removeFromUpNext(index)

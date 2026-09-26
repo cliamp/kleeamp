@@ -242,7 +242,6 @@ fun LibrarySmartPlaylistPane(
                         current = current,
                         playing = playing,
                         onPlay = onPlay,
-                        onAddToQueue = onAddToQueue,
                         onOpenMenu = { menuFor = it },
                         loading = loading,
                         favScope = favScope,
@@ -499,7 +498,6 @@ private fun SmartPlaylistDetail(
     current: Station?,
     playing: Boolean,
     onPlay: (Station, List<Station>) -> Unit,
-    onAddToQueue: (Station) -> Unit = {},
     onOpenMenu: (Station) -> Unit = {},
     loading: Boolean = false,
     favScope: FavScope = FavScope.All,
@@ -623,7 +621,6 @@ private fun SmartPlaylistDetail(
                     leading = {
                         SongCover(s = s, current = current, playing = playing)
                     },
-                    onQueue = { onAddToQueue(s) },
                     trailing = {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,

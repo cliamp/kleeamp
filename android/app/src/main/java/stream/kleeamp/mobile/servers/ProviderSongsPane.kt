@@ -350,7 +350,6 @@ fun ProviderSongsPane(
                             trailing = {
                                 OverflowButton({ menuFor = s }, size = 16)
                             },
-                            onQueue = { onAddToQueue(s) },
                         ) {
                             Mono(
                                 s.name,

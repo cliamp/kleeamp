@@ -57,6 +57,14 @@ object PlaybackBus {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+    /**
+     * Counts user queue adds: each [publishQueued] bumps it, so observers
+     * see every add distinctly even back-to-back. The root pill hosts the
+     * "Added to Up Next" confirmation off this.
+     */
+    private val _queuedCount = MutableStateFlow(0)
+    val queuedCount: StateFlow<Int> = _queuedCount.asStateFlow()
+
     fun publishSpectrum(v: FloatArray) { _spectrum.value = v }
     fun publishSpectrumLive(v: Boolean) { _spectrumLive.value = v }
     fun publishWaveform(v: FloatArray) { _waveform.value = v }
@@ -67,6 +75,7 @@ object PlaybackBus {
     fun publishFormat(v: StreamFormat) { _format.value = v }
     fun publishError(v: String?) { _error.value = v }
     fun publishReconnect(attempt: Int) { _reconnectAttempt.value = attempt }
+    fun publishQueued() { _queuedCount.value += 1 }
 }
 
 data class StreamFormat(

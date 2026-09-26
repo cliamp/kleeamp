@@ -225,7 +225,6 @@ fun StationsScreen(
                             active = current?.url == s.url,
                             playing = playing && current?.url == s.url,
                             onPlay = { onPlay(s, cliamp) },
-                            onQueue = { onAddToQueue(s) },
                             onOpenMenu = { menuFor = s },
                         )
                     }
@@ -276,7 +275,6 @@ fun StationsScreen(
                         active = current?.url == s.url,
                         playing = playing && current?.url == s.url,
                         onPlay = { onPlay(s, custom) },
-                        onQueue = { onAddToQueue(s) },
                         onOpenMenu = { menuFor = s },
                     )
                 }
@@ -355,7 +353,6 @@ fun StationsScreen(
                         active = current?.url == s.url,
                         playing = playing && current?.url == s.url,
                         onPlay = { onPlay(s, directory.stations) },
-                        onQueue = { onAddToQueue(s) },
                         onOpenMenu = { menuFor = s },
                     )
                 }
@@ -431,7 +428,6 @@ private fun StationRow(
     active: Boolean,
     playing: Boolean,
     onPlay: () -> Unit,
-    onQueue: () -> Unit,
     onOpenMenu: () -> Unit,
 ) {
     val p = LocalPalette.current
@@ -442,7 +438,6 @@ private fun StationRow(
         gutter = 8.dp,
         railOffset = 14.dp,
         leading = { StationThumb(station, active, playing) },
-        onQueue = onQueue,
         trailing = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (station.votes > 0) {
@@ -662,7 +657,6 @@ private fun CustomStationRow(
     active: Boolean,
     playing: Boolean,
     onPlay: () -> Unit,
-    onQueue: () -> Unit,
     onOpenMenu: () -> Unit,
 ) {
     val p = LocalPalette.current
@@ -673,7 +667,6 @@ private fun CustomStationRow(
         gutter = 8.dp,
         railOffset = 14.dp,
         leading = { StationThumb(station, active, playing) },
-        onQueue = onQueue,
         trailing = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OverflowButton(onOpenMenu, size = 16)

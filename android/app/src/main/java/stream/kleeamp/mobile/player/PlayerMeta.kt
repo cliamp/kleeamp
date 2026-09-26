@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -158,6 +159,7 @@ internal fun PlayerStatusRow(
             if (model.shuffled) "stop shuffling" else "shuffle",
             tint = if (model.shuffled) p.accent else p.inkSecondary,
         ) { actions.onToggleShuffle() }
+        SpeedAction(speed = model.state.speed) { actions.onOpenSpeed() }
         SmallAction(KleeampIcons.MeterSmall, "scope and equaliser", onClick = actions.onOpenScope)
         OverflowButton({ menuOpen = true }, size = 16)
     }
@@ -215,13 +217,6 @@ private fun playerMenuActions(
                 null
             },
             onClick = onOpenOutput,
-        ),
-        MenuAction(
-            id = "speed",
-            label = "Playback Speed",
-            subtitle = "currently ${speedLabel(model.state.speed)}",
-            iconText = "1×",
-            onClick = actions.onOpenSpeed,
         ),
         MenuAction(
             id = "sleep",
@@ -378,6 +373,30 @@ internal fun SmallAction(
 internal fun speedLabel(v: Float): String {
     val s = if (v % 1f == 0f) v.toInt().toString() else v.toString().trimEnd('0')
     return "${s}×"
+}
+
+/** Playback speed as a terse mono key: opens the speed sheet. */
+@Composable
+internal fun SpeedAction(speed: Float, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    // Sized to the label (5 glyphs at 0.25x) with a 44dp minimum tap
+    // target like the icon keys: a fixed box ellipsized the slow speeds
+    // to "0.2…".
+    Box(
+        Modifier
+            .sizeIn(minWidth = 44.dp, minHeight = 44.dp)
+            .clip(RoundedCornerShape(KleeampShape.small))
+            .microPress(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Mono(
+            speedLabel(speed),
+            KleeampType.meta,
+            if (speed != 1f) p.accent else p.inkSecondary,
+            Modifier.padding(horizontal = 3.dp),
+            maxLines = 1,
+        )
+    }
 }
 
 /**

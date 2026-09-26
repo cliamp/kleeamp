@@ -1,12 +1,13 @@
 # OpenCode
 
-This repo is the **Android app**. The player UI lives in **cliamp**, a separate Go project.
+This repo holds the **Android app** and the **iOS app**. The player UI lives in **cliamp**, a separate Go project.
 
 ## Source map
 
 | Tree                                                | Role                                       |
 | --------------------------------------------------- | ------------------------------------------ |
-| this repository                                     | Kotlin / Compose Android client            |
+| `android/`                                          | Kotlin / Compose Android client            |
+| `ios/`                                              | SwiftUI iOS client (port in progress)      |
 | [bjarneo/cliamp](https://github.com/bjarneo/cliamp) | TUI source of truth (Bubbletea, Lip Gloss) |
 
 Find cliamp without machine-specific paths:
@@ -38,9 +39,14 @@ Two local skills own product work. Everything else is generic language guidance.
 
 `go-skills-router`, `go-coding-standards`, `go-cli`, `go-architecture-review`, `go-concurrency-review`
 
+**Swift / SwiftUI** — no local Swift skill set exists. Use standard Swift 6 and SwiftUI conventions, and treat `docs/design.md` plus `docs/ios-parity.md` as the product source of truth. Do not invent or claim Swift skills that are not installed.
+
 Do not add git plugin entries to `opencode.jsonc`.
 
 ## Routing
+
+**iOS port**  
+Read `docs/ios-parity.md` first; it owns scope, IDs, and state. `ios/project.yml` is the project source: run `xcodegen generate` inside `ios/` before building, and never commit the generated project. Build with `xcodebuild` (see `ios/README.md` for pinned commands). When porting behavior, read the Android source as the reference; do not edit `android/` from an iOS task.
 
 **Android cleanup**  
 Load `android-kotlin-modernize` plus the Kotlin/Compose set. Do not edit cliamp.

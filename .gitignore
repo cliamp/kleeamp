@@ -19,5 +19,13 @@ keystore.properties
 # test artifact: local Room database dump
 kls_database.db
 
+# Xcode: the project is generated from ios/project.yml by XcodeGen
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+.swiftpm/
+.build/
+
 # local planning scratchpad, not for upstream (for now)
 plan.md

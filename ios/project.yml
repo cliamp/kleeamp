@@ -1,0 +1,94 @@
+name: Cliamp
+
+options:
+  minimumXcodeGenVersion: 2.45.0
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "18.0"
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+    GCC_TREAT_WARNINGS_AS_ERRORS: YES
+
+packages:
+  CliampCore:
+    path: CliampCore
+  CliampDesign:
+    path: CliampDesign
+
+targets:
+  Cliamp:
+    type: application
+    platform: iOS
+    sources:
+      - path: Cliamp/Sources
+      - path: Cliamp/Resources
+    dependencies:
+      - package: CliampCore
+      - package: CliampDesign
+    info:
+      path: Cliamp/Info.plist
+      properties:
+        CFBundleDisplayName: cliamp
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UIAppFonts:
+          - poppins_regular.ttf
+          - poppins_medium.ttf
+          - poppins_bold.ttf
+          - jetbrains_mono_regular.ttf
+          - jetbrains_mono_medium.ttf
+          - jetbrains_mono_bold.ttf
+        UIBackgroundModes:
+          - audio
+        # DEC-02: the managed music folder is the user's own copy space, so
+        # Files and Finder show it and files can be dropped straight in.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        # DEC-07: the directory lists many stations that still stream over
+        # plain HTTP, and the media-only exception is not honoured for
+        # AVPlayerItem loads on iOS 26 (verified -1022 with
+        # NSAllowsArbitraryLoadsForMedia set). A blanket exception matches
+        # Android's behaviour; QA-05 owns the App Review justification note.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: stream.cliamp.mobile
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1,2"
+        MARKETING_VERSION: "0.0.1"
+        CURRENT_PROJECT_VERSION: "1"
+    scheme:
+      testTargets:
+        - CliampTests
+      gatherCoverageData: false
+
+  CliampTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Cliamp/Tests
+    dependencies:
+      - target: Cliamp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: stream.cliamp.mobile.tests
+        # The Swift package products (Citadel → Crypto) are framework
+        # bundles, so the hosted test bundle needs an Info.plist too.
+        GENERATE_INFOPLIST_FILE: YES

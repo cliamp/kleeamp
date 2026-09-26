@@ -200,16 +200,18 @@ internal fun PortraitPlayer(
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.Top),
             ) {
-                // Weights are measured after the text, so maxHeight is the
-                // real leftover; fill = false keeps the plate hugging the
-                // top and leaves the slack under the text, as before.
+                // Yesterday's full-screen player always resolved the plate to
+                // the 340.dp cap; inside the sheet the leftover height is
+                // smaller, so including maxHeight here shrank it. Pin the
+                // plate to that size: width still concedes on narrow frames,
+                // height never shrinks it.
                 BoxWithConstraints(
                     Modifier
                         .weight(1f, fill = false)
                         .fillMaxWidth(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    val side = minOf(maxWidth, maxHeight, 340.dp)
+                    val side = minOf(maxWidth, 340.dp)
                     StationArt(
                         station = model.shownStation,
                         modifier = Modifier.size(side),

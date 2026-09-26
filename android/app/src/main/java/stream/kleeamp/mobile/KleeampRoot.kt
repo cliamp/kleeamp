@@ -40,7 +40,6 @@ import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import kotlinx.coroutines.Job
@@ -71,7 +70,7 @@ import stream.kleeamp.mobile.library.LibrarySongInfoPane
 import stream.kleeamp.mobile.library.LibraryScreen
 import stream.kleeamp.mobile.podcasts.PodcastShowScreen
 import stream.kleeamp.mobile.podcasts.PodcastsScreen
-import stream.kleeamp.mobile.player.UpNextScreen
+import stream.kleeamp.mobile.player.UpNextSheet
 import stream.kleeamp.mobile.player.ScopeScreen
 import stream.kleeamp.mobile.settings.ScrobbleWizard as ScrobbleWizardScreen
 import stream.kleeamp.mobile.servers.ProviderCatalog
@@ -164,6 +163,9 @@ fun KleeampRoot(
     // the sheet when back returns from Up Next or Scope opened inside it.
     var playerOpen by rememberSaveable { mutableStateOf(false) }
     var playerReturn by remember { mutableStateOf(false) }
+    // Up Next opens stacked over the player sheet, so its previous page
+    // is always Now Playing; back peels it back to the player.
+    var upNextOpen by rememberSaveable { mutableStateOf(false) }
 
     // Playback-global state stays at the root: the chrome and every screen
     // read current/playing. Prefs, provider and progress flows are collected
@@ -238,12 +240,6 @@ fun KleeampRoot(
     }
     val switchTab: (Tab) -> Unit = { newTab -> goToTab(newTab, true) }
 
-    // Route-guarded navigation, read here in the chrome (and once per
-    // destination that needs it) so the root never subscribes to the back
-    // stack. Guarded opens: tapping the mini player while already on that
-    // page is a no-op instead of stacking a duplicate destination.
-    val chromeNav = rememberGuardedNav(navController)
-
     // Cold-start reveal: the first frames rearrange as resident data lands
     // (chrome measures, lists fill), so the whole frame fades and rises in
     // once instead of flashing each change. Saved across rotation so it
@@ -308,7 +304,10 @@ fun KleeampRoot(
                 reconnecting = reconnect,
                 hasPrev = playerState.hasPrev,
                 hasNext = playerState.hasNext,
-                onOpenUpNext = chromeNav.openUpNext,
+                onOpenUpNext = {
+                    playerOpen = true
+                    upNextOpen = true
+                },
                 onOpen = { playerOpen = true },
             )
 
@@ -577,27 +576,6 @@ fun KleeampRoot(
             }
 
             // -- Full overlay destinations (cover the chrome) --
-            composable<UpNext> {
-                OverlayCover {
-                UpNextScreen(
-                    player = player,
-                    current = station,
-                    playing = playerState.playing,
-                    onPlay = { index ->
-                        player.currentUpNext.getOrNull(index)?.let(repository::reportPlay)
-                        player.playUpNextEntry(index)
-                    },
-                    // Back from a sheet detour reopens the sheet over the list.
-                    onBack = {
-                        navController.popBackStack()
-                        if (playerReturn) {
-                            playerReturn = false
-                            playerOpen = true
-                        }
-                    },
-                )
-                }
-            }
             composable<Scope> {
                 OverlayCover {
                 ScopeScreen(
@@ -738,11 +716,22 @@ fun KleeampRoot(
                     navController.navigate(Scope)
                 },
                 onOpenUpNext = {
-                    playerReturn = true
-                    playerOpen = false
-                    chromeNav.openUpNext()
+                    playerOpen = true
+                    upNextOpen = true
                 },
                 onDismiss = { playerOpen = false },
+            )
+        }
+        if (upNextOpen) {
+            UpNextSheet(
+                player = player,
+                current = station,
+                playing = playerState.playing,
+                onPlay = { index ->
+                    player.currentUpNext.getOrNull(index)?.let(repository::reportPlay)
+                    player.playUpNextEntry(index)
+                },
+                onDismiss = { upNextOpen = false },
             )
         }
 
@@ -778,29 +767,6 @@ private fun OverlayCover(content: @Composable () -> Unit) {    val p = LocalPale
             )
     ) {
         content()
-    }
-}
-
-/**
- * Route-guarded opens, scoped to the caller: the back-stack entry is read
- * here, so a navigation only recomposes the chrome or the destination that
- * asked - never the root.
- */
-private class GuardedNav(
-    val openUpNext: () -> Unit,
-)
-
-@Composable
-private fun rememberGuardedNav(navController: NavHostController): GuardedNav {
-    val route = navController.currentBackStackEntryAsState().value?.destination?.route
-    return remember(route) {
-        GuardedNav(
-            openUpNext = {
-                if (route?.startsWith(UpNext::class.qualifiedName!!) != true) {
-                    navController.navigate(UpNext)
-                }
-            },
-        )
     }
 }
 

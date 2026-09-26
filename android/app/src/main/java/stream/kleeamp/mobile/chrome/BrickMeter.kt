@@ -84,7 +84,7 @@ fun BrickMeter(
 
 /** Column count/geometry presets, straight from the concept. */
 enum class MeterSize(val columns: Int, val brick: Dp, val gap: Dp, val height: Dp) {
-    NowPlaying(Visualizer.Brick.columns, 4.dp, 3.dp, 66.dp),
+    NowPlaying(Visualizer.Brick.columns, 4.dp, 3.dp, 98.dp),
     Scope(32, 6.dp, 4.dp, 200.dp),
     Mini(14, 3.dp, 2.dp, 22.dp),
 }

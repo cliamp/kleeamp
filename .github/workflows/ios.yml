@@ -1,0 +1,66 @@
+name: ios
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned so the project file and the manifest agree. Bump deliberately.
+  XCODEGEN_VERSION: 2.45.4
+  XCODE_APP: /Applications/Xcode_26.6.app
+
+jobs:
+  simulator:
+    # macos-26 ships Xcode 26.6 (17F113), the same toolchain the local
+    # project is developed against. See ios/README.md for the matrix.
+    runs-on: macos-26
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s "$XCODE_APP"
+
+      - name: Install XcodeGen
+        run: |
+          curl -sL -o "$RUNNER_TEMP/xcodegen.zip" \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/$XCODEGEN_VERSION/xcodegen.zip"
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/xcodegen/bin" >> "$GITHUB_PATH"
+
+      - name: Generate project
+        run: xcodegen generate
+
+      # Package logic is plain Swift; `swift test` runs it on the runner
+      # without a simulator boot.
+      - name: Test CliampCore
+        run: swift test --package-path CliampCore
+
+      # Device signing is not configured in CI: the simulator build and the
+      # hosted unit tests run unsigned.
+      - name: Build app (unsigned)
+        run: |
+          xcodebuild build \
+            -project Cliamp.xcodeproj \
+            -scheme Cliamp \
+            -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Test app (unsigned)
+        run: |
+          xcodebuild test \
+            -project Cliamp.xcodeproj \
+            -scheme Cliamp \
+            -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
+            CODE_SIGNING_ALLOWED=NO

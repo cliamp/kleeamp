@@ -27,12 +27,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import stream.kleeamp.mobile.chrome.BackChevron
 import stream.kleeamp.mobile.chrome.Gutter
 import stream.kleeamp.mobile.chrome.ScreenHeader
 import stream.kleeamp.mobile.theme.KleeampShape
 import stream.kleeamp.mobile.chrome.microPress
+import stream.kleeamp.mobile.lyrics.LyricsQuery
 import stream.kleeamp.mobile.lyrics.LyricsViewModel
 import stream.kleeamp.mobile.theme.KleeampType
 import stream.kleeamp.mobile.theme.LocalPalette
@@ -86,8 +88,26 @@ internal fun LyricsScreen(
             }
         }
         when (ui.status) {
-            LyricsViewModel.Status.Loading -> CenterLyricNote("finding lyrics…")
-            LyricsViewModel.Status.Missing -> CenterLyricNote("no lyrics found")
+            LyricsViewModel.Status.Loading -> {
+                val looking = queryLabel(ui.query)
+                CenterLyricNote(if (looking.isBlank()) "finding lyrics…" else "looking up $looking…")
+            }
+            LyricsViewModel.Status.NoSong -> CenterLyricNote(
+                "no lyrics",
+                "play something, or wait for the stream to name it",
+            )
+            LyricsViewModel.Status.NotFound -> CenterLyricNote(
+                "no lyrics found",
+                queryLabel(ui.query),
+                actionLabel = "retry",
+                onAction = vm::retry,
+            )
+            LyricsViewModel.Status.Offline -> CenterLyricNote(
+                "couldn't reach lyrics",
+                "check the connection and retry",
+                actionLabel = "retry",
+                onAction = vm::retry,
+            )
             LyricsViewModel.Status.Instrumental -> CenterLyricNote("instrumental")
             LyricsViewModel.Status.Ready -> {
                 if (ui.lines.isEmpty()) {
@@ -130,11 +150,47 @@ private fun PlainLyrics(text: String) {
 }
 
 @Composable
-private fun CenterLyricNote(text: String) {
+private fun CenterLyricNote(
+    text: String,
+    sub: String = "",
+    actionLabel: String? = null,
+    onAction: () -> Unit = {},
+) {
     val p = LocalPalette.current
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Mono(text, KleeampType.rowPrimary, p.inkFaint, maxLines = 1)
+    Box(
+        Modifier.fillMaxSize().padding(horizontal = Gutter),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Mono(
+                text,
+                KleeampType.rowPrimary.copy(textAlign = TextAlign.Center),
+                p.inkFaint,
+                maxLines = 2,
+            )
+            if (sub.isNotBlank()) {
+                Mono(
+                    sub,
+                    KleeampType.rowSecondary.copy(textAlign = TextAlign.Center),
+                    p.inkFaint,
+                    maxLines = 2,
+                )
+            }
+            if (actionLabel != null) OffsetKey(actionLabel, onClick = onAction)
+        }
     }
+}
+
+/** "Singer – Song" for the lookup states; blank when there is nothing. */
+private fun queryLabel(query: LyricsQuery?): String {
+    if (query == null) return ""
+    return listOf(query.artist, query.title)
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .joinToString(" – ")
 }
 
 /** Small outlined key for the offset stepper. */

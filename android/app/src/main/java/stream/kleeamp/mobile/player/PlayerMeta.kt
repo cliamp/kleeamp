@@ -147,30 +147,38 @@ internal fun UpNextBadge(
  * Lyrics key for the Now Playing page: the outlined badge with icon plus
  * label, matching the Up Next badge it sits beside. Opens the lyrics sheet
  * stacked over the player. 40dp like the other page keys. Thin accent
- * border so it reads as live against the backdrop.
+ * border so it reads as live against the backdrop; dimmed and inert when
+ * there is definitively nothing to look up (idle, or a stream naming no
+ * title) — dimmed always means non-openable here.
  */
 @Composable
 internal fun LyricsBadge(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    dimmed: Boolean = false,
 ) {
     val p = LocalPalette.current
     Box(
         modifier
             .height(40.dp)
             .semantics { role = Role.Button }
-            .microPress(onClick = onClick),
+            .microPress(enabled = !dimmed, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Row(
             Modifier
-                .border(0.5.dp, p.accent, RoundedCornerShape(KleeampShape.small))
+                .border(0.5.dp, if (dimmed) p.chipBorder else p.accent, RoundedCornerShape(KleeampShape.small))
                 .padding(horizontal = 10.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(KleeampIcons.MusicNote, "open lyrics", Modifier.size(16.dp), tint = p.accent)
-            Mono("LYRICS", KleeampType.chip, p.ink, maxLines = 1)
+            Icon(
+                KleeampIcons.MusicNote,
+                if (dimmed) "no lyrics to look up" else "open lyrics",
+                Modifier.size(16.dp),
+                tint = if (dimmed) p.inkFaint else p.accent,
+            )
+            Mono("LYRICS", KleeampType.chip, if (dimmed) p.inkFaint else p.ink, maxLines = 1)
         }
     }
 }

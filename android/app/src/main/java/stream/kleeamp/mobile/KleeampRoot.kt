@@ -67,6 +67,8 @@ import stream.kleeamp.mobile.chrome.NoticeHost
 import stream.kleeamp.mobile.chrome.QueueConfirmHost
 import stream.kleeamp.mobile.player.MiniPlayer
 import stream.kleeamp.mobile.player.NowPlayingSheet
+import stream.kleeamp.mobile.player.LyricsSheet
+import stream.kleeamp.mobile.lyrics.LyricsViewModel
 import stream.kleeamp.mobile.chrome.Tab
 import stream.kleeamp.mobile.search.SearchScreen
 import stream.kleeamp.mobile.library.FavScope
@@ -197,6 +199,9 @@ fun KleeampRoot(
     // to reopen.
     var upNextOpen by rememberSaveable { mutableStateOf(false) }
     var scopeOpen by rememberSaveable { mutableStateOf(false) }
+    // Synced lyrics stack over the player exactly like Up Next and Scope:
+    // the player sheet underneath stays open, back peels one layer back.
+    var lyricsOpen by rememberSaveable { mutableStateOf(false) }
     // The add-to-playlist picker is a bottom sheet over whatever opened it,
     // not a page: the tapped song arrives as the Station itself, so there is
     // no re-resolve and no "song gone". Holds the song only (not saveable:
@@ -858,6 +863,7 @@ fun KleeampRoot(
                 vm = appViewModel { app -> NowPlayingViewModel(app.player, app.prefs) },
                 onOpenScope = { scopeOpen = true },
                 onOpenUpNext = { upNextOpen = true },
+                onOpenLyrics = { lyricsOpen = true },
                 onDismiss = { playerOpen = false },
             )
         }
@@ -881,6 +887,16 @@ fun KleeampRoot(
                 playing = playerState.playing,
                 onDismiss = { scopeOpen = false },
             )
+        }
+        if (lyricsOpen) {
+            app?.let { kleeamp ->
+                LyricsSheet(
+                    vm = appViewModel { _ ->
+                        LyricsViewModel(kleeamp.player, kleeamp.prefs, kleeamp.lyrics)
+                    },
+                    onDismiss = { lyricsOpen = false },
+                )
+            }
         }
         // The add-to-playlist picker stacks over whatever opened it and
         // peels back to exactly that: the song stays composed underneath.

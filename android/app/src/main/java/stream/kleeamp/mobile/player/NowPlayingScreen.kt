@@ -122,6 +122,7 @@ internal data class PlayerModel(
 internal data class PlayerActions(
     val onBack: () -> Unit,
     val onOpenUpNext: () -> Unit,
+    val onOpenLyrics: () -> Unit,
     val onToggleShuffle: () -> Unit,
     val onOpenSpeed: () -> Unit,
     val onCycleRepeat: () -> Unit,
@@ -144,6 +145,7 @@ fun NowPlayingScreen(
     vm: NowPlayingViewModel,
     onOpenScope: () -> Unit,
     onOpenUpNext: () -> Unit,
+    onOpenLyrics: () -> Unit,
     onBack: () -> Unit,
 ) {
     var fullscreen by rememberSaveable { mutableStateOf(false) }
@@ -189,6 +191,7 @@ fun NowPlayingScreen(
     val actions = PlayerActions(
         onBack = onBack,
         onOpenUpNext = onOpenUpNext,
+        onOpenLyrics = onOpenLyrics,
         onToggleShuffle = { vm.player.toggleShuffle() },
         onOpenSpeed = { speedOpen = true },
         onCycleRepeat = { vm.player.toggleRepeat() },

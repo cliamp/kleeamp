@@ -143,6 +143,38 @@ internal fun UpNextBadge(
     }
 }
 
+/**
+ * Lyrics key for the Now Playing page: the outlined badge with icon plus
+ * label, matching the Up Next badge it sits beside. Opens the lyrics sheet
+ * stacked over the player. 40dp like the other page keys. Thin accent
+ * border so it reads as live against the backdrop.
+ */
+@Composable
+internal fun LyricsBadge(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val p = LocalPalette.current
+    Box(
+        modifier
+            .height(40.dp)
+            .semantics { role = Role.Button }
+            .microPress(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            Modifier
+                .border(0.5.dp, p.accent, RoundedCornerShape(KleeampShape.small))
+                .padding(horizontal = 10.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(KleeampIcons.MusicNote, "open lyrics", Modifier.size(16.dp), tint = p.accent)
+            Mono("LYRICS", KleeampType.chip, p.ink, maxLines = 1)
+        }
+    }
+}
+
 /** Compact outlined header control, with a full-height touch target. */
 @Composable
 internal fun UpNextButton(

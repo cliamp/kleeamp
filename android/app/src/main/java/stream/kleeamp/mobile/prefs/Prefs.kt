@@ -117,6 +117,7 @@ class Prefs(private val context: Context) {
         val speedPerSection = booleanPreferencesKey("speed_per_section")
         val boostDb = intPreferencesKey("boost_db")               // 0..12, LoudnessEnhancer gain
         val repeat = stringPreferencesKey("repeat")
+        val lyricsOffset = intPreferencesKey("lyrics_offset")
         val lbToken = stringPreferencesKey("lb_token")
         val autoResume = booleanPreferencesKey("auto_resume")
         val autoDownload = booleanPreferencesKey("auto_download")
@@ -207,6 +208,10 @@ class Prefs(private val context: Context) {
     }
     /** Repeat mode, off/all/one like cliamp. Survives process death. */
     val repeat: Flow<String> = context.settingsStore.data.map { it[K.repeat] ?: "off" }
+    /** Synced-lyrics offset in ms, ±10s like cliamp's `[`/`]` keys. */
+    val lyricsOffset: Flow<Int> = context.settingsStore.data.map {
+        (it[K.lyricsOffset] ?: 0).coerceIn(-10_000, 10_000)
+    }
 
     /** Podcasts subscribed-shows section as a grid. */
     val subsGrid: StateFlow<Boolean> = subsGridFlag.asStateFlow()
@@ -424,6 +429,7 @@ class Prefs(private val context: Context) {
     }
     suspend fun setBoostDb(v: Int) = put(K.boostDb, v.coerceIn(0, MaxBoostDb))
     suspend fun setRepeat(v: String) = put(K.repeat, v)
+    suspend fun setLyricsOffset(v: Int) = put(K.lyricsOffset, v.coerceIn(-10_000, 10_000))
     suspend fun setSubsGrid(v: Boolean) {
         subsGridFlag.value = v
         put(K.subsGrid, v)

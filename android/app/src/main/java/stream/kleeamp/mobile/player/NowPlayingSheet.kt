@@ -15,6 +15,7 @@ fun NowPlayingSheet(
     vm: NowPlayingViewModel,
     onOpenScope: () -> Unit,
     onOpenUpNext: () -> Unit,
+    onOpenLyrics: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     FullSheetShell(onDismiss = onDismiss, inlineHandle = true) {
@@ -22,6 +23,7 @@ fun NowPlayingSheet(
             vm = vm,
             onOpenScope = onOpenScope,
             onOpenUpNext = onOpenUpNext,
+            onOpenLyrics = onOpenLyrics,
             onBack = onDismiss,
         )
     }

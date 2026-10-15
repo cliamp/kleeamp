@@ -224,6 +224,7 @@ internal fun PortraitPlayer(
         ) {
             BackChevron(actions.onBack)
             Spacer(Modifier.weight(1f))
+            LyricsBadge(actions.onOpenLyrics)
             UpNextBadge(model.upNextCount, actions.onOpenUpNext)
         }
         // Tight: buys room back for the plate (see pinned text lines).
@@ -404,12 +405,14 @@ internal fun LandscapePlayer(
             Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 // The end padding is the gap: long titles scroll inside
                 // their lane and stop here instead of sticking to the badge.
                 Box(Modifier.weight(1f).padding(end = 12.dp)) {
                     PlayerMeta(model)
                 }
+                LyricsBadge(actions.onOpenLyrics)
                 UpNextBadge(model.upNextCount, actions.onOpenUpNext)
             }
             Spacer(Modifier.weight(1f))

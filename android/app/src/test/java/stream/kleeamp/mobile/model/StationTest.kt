@@ -1,5 +1,6 @@
 package stream.kleeamp.mobile.model
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -11,6 +12,34 @@ class StationTest {
         url = "https://example.com/x",
         source = source,
     )
+
+    @Test fun albumArtistAlbumPrefersAlbumArtist() {
+        val song = station(StationSource.Local, "l1").copy(
+            artist = "Daft Punk / Gabrielle",
+            albumArtist = "Daft Punk",
+            album = "Alive 2007",
+        )
+        assertEquals("Daft Punk · Alive 2007", song.albumArtistAlbum)
+        assertEquals("Daft Punk / Gabrielle · Alive 2007", song.artistAlbum)
+    }
+
+    @Test fun albumArtistAlbumFallsBackToTrackArtist() {
+        val song = station(StationSource.Local, "l1").copy(
+            artist = "Track Artist",
+            album = "Album",
+        )
+        assertEquals("Track Artist · Album", song.albumArtistAlbum)
+        assertEquals("Track Artist · Album", song.copy(albumArtist = "   ").albumArtistAlbum)
+    }
+
+    @Test fun albumArtistAlbumOmitsBlankFieldsAndSeparators() {
+        val song = station(StationSource.Local, "l1")
+        assertEquals("", song.albumArtistAlbum)
+        assertEquals("Album Artist", song.copy(albumArtist = "Album Artist").albumArtistAlbum)
+        assertEquals("Track Artist", song.copy(artist = "Track Artist").albumArtistAlbum)
+        assertEquals("Album", song.copy(album = "Album").albumArtistAlbum)
+        assertEquals("", song.copy(artist = " ", albumArtist = " ", album = " ").albumArtistAlbum)
+    }
 
     @Test fun channelTrackIdIsATrack() {
         val track = station(StationSource.Cliamp, "cliamp:edm:42")

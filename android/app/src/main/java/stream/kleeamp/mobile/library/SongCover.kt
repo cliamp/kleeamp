@@ -365,6 +365,7 @@ internal fun PlaylistMemberRow(
     queue: List<Station>,
     onPlay: (Station, List<Station>) -> Unit,
     onOpenMenu: (Station) -> Unit,
+    subtitle: String = s.artistAlbum,
 ) {
     val p = LocalPalette.current
     ListRow(
@@ -385,7 +386,7 @@ internal fun PlaylistMemberRow(
     ) {
         Mono(s.name, KleeampType.rowPrimary, if (current?.url == s.url) p.accent else p.ink, maxLines = 1)
         Mono(
-            s.artistAlbum.ifBlank {
+            subtitle.ifBlank {
                 when {
                     s.source == StationSource.Local -> durationLabel(s.durationMs)
                     s.source == StationSource.Podcast -> "podcast"

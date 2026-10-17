@@ -126,6 +126,7 @@ fun LibraryAlbumPane(
                     items(shown, key = { it.id }) { s ->
                         PlaylistMemberRow(
                             s = s,
+                            subtitle = s.artist,
                             current = current,
                             playing = playing,
                             queue = shown,

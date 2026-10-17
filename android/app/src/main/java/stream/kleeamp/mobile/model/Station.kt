@@ -50,6 +50,12 @@ data class Station(
             .filter { it.isNotBlank() }
             .joinToString(" · ")
 
+    /** `album artist · album`, falling back to track artist when album artist is blank. */
+    val albumArtistAlbum: String
+        get() = listOf(albumArtist.ifBlank { artist }, album)
+            .filter { it.isNotBlank() }
+            .joinToString(" · ")
+
     /**
      * A finite thing with an end, as opposed to a live stream. Decides whether
      * the queue is handed to the player as a real playlist it can advance

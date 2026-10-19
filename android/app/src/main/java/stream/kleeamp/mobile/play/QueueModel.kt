@@ -108,7 +108,7 @@ class QueueModel {
     fun publishPanel() {
         val window = _upNext.value
         val (list, idx) =
-            if (source.isNotEmpty() && (source.all { it.isTrack } || source.all { !it.isTrack })) {
+            if (source.isNotEmpty()) {
                 val abs = (windowBase + _upNextIndex.value)
                     .takeIf { _upNextIndex.value in window.indices && it in source.indices }
                     ?: -1

@@ -42,8 +42,6 @@ class PlaylistDetailViewModel(
         val dupCount: Int = 0,
         /** Stored ids with nothing playable behind them. */
         val missingCount: Int = 0,
-        /** Bookmarked member index, clamped into range. */
-        val bookmarkIndex: Int? = null,
     )
 
     sealed interface Event {
@@ -56,7 +54,6 @@ class PlaylistDetailViewModel(
         data class OpenShow(val show: PodcastShow) : Event
         data object Dedupe : Event
         data object PurgeMissing : Event
-        data class Bookmark(val index: Int?) : Event
     }
 
     private data class CollectionState(
@@ -72,7 +69,6 @@ class PlaylistDetailViewModel(
         val sort: PlaylistSort = PlaylistSort.Title,
         val browse: Boolean = false,
         val showState: ShowState = ShowState(),
-        val bookmark: Int? = null,
     )
 
     val state: StateFlow<UiState> = combine(
@@ -89,9 +85,8 @@ class PlaylistDetailViewModel(
                 prefs.favorites,
                 prefs.playlistSort(slug),
                 podcasts.show,
-                prefs.playlistBookmark(slug),
-            ) { directory, favorites, sort, show, bookmark ->
-                MetaState(directory, favorites, sort, showState = show, bookmark = bookmark)
+            ) { directory, favorites, sort, show ->
+                MetaState(directory, favorites, sort, showState = show)
             },
             prefs.playlistBrowse(slug),
         ) { meta, browse -> meta.copy(browse = browse) },
@@ -117,7 +112,6 @@ class PlaylistDetailViewModel(
             favorites = meta.favorites,
             dupCount = ids.size - ids.toSet().size,
             missingCount = (ids.toSet() - memberIds).size,
-            bookmarkIndex = meta.bookmark?.takeIf { it in members.indices },
         )
     }.stateInUi(
         viewModelScope,
@@ -156,7 +150,6 @@ class PlaylistDetailViewModel(
                 val kept = ids.filter { it in live }
                 if (kept.size != ids.size) playlists.setOrder(slug, kept)
             }
-            is Event.Bookmark -> prefs.setPlaylistBookmark(slug, e.index)
         }
     }
 

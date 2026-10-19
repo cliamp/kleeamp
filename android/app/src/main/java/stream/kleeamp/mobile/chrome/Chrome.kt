@@ -52,8 +52,10 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
@@ -385,7 +387,34 @@ fun KleeampTabBar(position: () -> Float?, onSelect: (Tab) -> Unit, modifier: Mod
     Column(modifier.fillMaxWidth().background(p.ground)) {
         HairlineDivider(region = true)
         Row(
-            Modifier.fillMaxWidth(),
+            Modifier
+                .fillMaxWidth()
+                .drawBehind {
+                    val settled = pos?.coerceIn(0f, (Tab.entries.size - 1).toFloat())
+                        ?: return@drawBehind
+                    val n = Tab.entries.size
+                    val tabW = size.width / n
+                    val lo = settled.toInt().coerceIn(0, n - 1)
+                    val hi = (lo + 1).coerceAtMost(n - 1)
+                    val f = (settled - lo).coerceIn(0f, 1f)
+                    val c0 = (lo + 0.5f) * tabW
+                    val c1 = (hi + 0.5f) * tabW
+                    val center = c0 + (c1 - c0) * f
+                    val base = 14.dp.toPx()
+                    val half = base / 2f +
+                        kotlin.math.abs(c1 - c0) * 0.16f *
+                            kotlin.math.sin(kotlin.math.PI.toFloat() * f)
+                    val markerH = 3.dp.toPx()
+                    // Sit just under the label, where the old per-tab marker
+                    // was, instead of down at the bar's bottom edge.
+                    val y = 52.dp.toPx()
+                    drawRoundRect(
+                        color = p.accent,
+                        topLeft = Offset(center - half, y),
+                        size = Size(half * 2f, markerH),
+                        cornerRadius = CornerRadius(markerH / 2f, markerH / 2f),
+                    )
+                },
         ) {
             Tab.entries.forEachIndexed { index, tab ->
                 TabItem(
@@ -414,6 +443,11 @@ private fun TabItem(
 ) {
     val p = LocalPalette.current
     val tint = lerp(p.inkTertiary, p.accent, weight)
+    val labelStyle = if (weight > 0.5f) {
+        KleeampType.tabLabel.copy(fontWeight = FontWeight.Medium)
+    } else {
+        KleeampType.tabLabel
+    }
     Column(
         modifier
             .microPress { onClick() }
@@ -424,7 +458,7 @@ private fun TabItem(
         Box(Modifier.height(17.dp), contentAlignment = Alignment.Center) {
             Icon(tabIcon(tab), null, Modifier.size(17.dp), tint = tint)
         }
-        Mono(tab.label, KleeampType.tabLabel, tint)
+        Mono(tab.label, labelStyle, tint)
     }
 }
 
@@ -451,7 +485,31 @@ fun KleeampTabRail(
             Modifier
                 .width(TabRailWidth - 1.dp)
                 .fillMaxHeight()
-                .padding(top = statusTop + 10.dp, bottom = navBottom + 10.dp),
+                .padding(top = statusTop + 10.dp, bottom = navBottom + 10.dp)
+                .drawBehind {
+                    val settled = pos?.coerceIn(0f, (Tab.entries.size - 1).toFloat())
+                        ?: return@drawBehind
+                    val n = Tab.entries.size
+                    val tabH = size.height / n
+                    val lo = settled.toInt().coerceIn(0, n - 1)
+                    val hi = (lo + 1).coerceAtMost(n - 1)
+                    val f = (settled - lo).coerceIn(0f, 1f)
+                    val c0 = (lo + 0.5f) * tabH
+                    val c1 = (hi + 0.5f) * tabH
+                    val center = c0 + (c1 - c0) * f
+                    val base = 14.dp.toPx()
+                    val half = base / 2f +
+                        kotlin.math.abs(c1 - c0) * 0.16f *
+                            kotlin.math.sin(kotlin.math.PI.toFloat() * f)
+                    val markerW = 3.dp.toPx()
+                    val x = size.width - 8.dp.toPx()
+                    drawRoundRect(
+                        color = p.accent,
+                        topLeft = Offset(x, center - half),
+                        size = Size(markerW, half * 2f),
+                        cornerRadius = CornerRadius(markerW / 2f, markerW / 2f),
+                    )
+                },
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -476,6 +534,11 @@ private fun RailItem(
 ) {
     val p = LocalPalette.current
     val tint = lerp(p.inkTertiary, p.accent, weight)
+    val labelStyle = if (weight > 0.5f) {
+        KleeampType.tabLabel.copy(fontWeight = FontWeight.Medium)
+    } else {
+        KleeampType.tabLabel
+    }
     Column(
         modifier
             .width(70.dp)
@@ -487,7 +550,7 @@ private fun RailItem(
         Box(Modifier.height(17.dp), contentAlignment = Alignment.Center) {
             Icon(tabIcon(tab), null, Modifier.size(17.dp), tint = tint)
         }
-        Mono(tab.label, KleeampType.tabLabel, tint, maxLines = 1)
+        Mono(tab.label, labelStyle, tint, maxLines = 1)
     }
 }
 

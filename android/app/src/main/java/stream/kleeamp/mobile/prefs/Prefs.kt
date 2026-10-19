@@ -154,7 +154,7 @@ class Prefs(private val context: Context) {
         val customTheme = stringPreferencesKey("custom_theme")
         val playlistSorts = stringPreferencesKey("playlist_sorts")  // slug -> PlaylistSort.ordinal
         val playlistBrowse = stringPreferencesKey("playlist_browse")  // slugs opened in browse
-        val playlistBookmarks = stringPreferencesKey("playlist_bookmarks")  // slug -> member index
+
         val subsGrid = booleanPreferencesKey("subs_grid")           // podcasts: subscribed shows as tiles
         val podDirectoryGrid = booleanPreferencesKey("pod_directory_grid") // podcasts: directory as tiles
     }
@@ -350,10 +350,7 @@ class Prefs(private val context: Context) {
     // frame, snapshotted to one DataStore set for restore-after-boot.
     private val browseOverrides = MutableStateFlow<Set<String>>(emptySet())
     private var browsePersist: Job? = null
-    // Bookmarks ride the same shape as sorts: in memory for the tap's own
-    // frame, merged into one DataStore map for restore-after-boot.
-    private val bookmarkOverrides = MutableStateFlow<Map<String, Int>>(emptyMap())
-    private var bookmarkPersist: Job? = null
+
 
     /** The saved theme, read synchronously at startup (see init) so the very
      * first frame already wears it instead of flashing the default. */
@@ -376,9 +373,6 @@ class Prefs(private val context: Context) {
         browseOverrides.value = p[K.playlistBrowse]?.let { raw ->
             runCatching { Http.json.decodeFromString<Set<String>>(raw) }.getOrNull()
         } ?: emptySet()
-        bookmarkOverrides.value = p[K.playlistBookmarks]?.let { raw ->
-            runCatching { Http.json.decodeFromString<Map<String, Int>>(raw) }.getOrNull()
-        } ?: emptyMap()
         subsGridFlag.value = p[K.subsGrid] ?: true
         podDirectoryGridFlag.value = p[K.podDirectoryGrid] ?: true
     }
@@ -527,28 +521,6 @@ class Prefs(private val context: Context) {
                     runCatching { Http.json.decodeFromString<Map<String, Int>>(raw) }.getOrNull()
                 } ?: emptyMap()
                 p[K.playlistSorts] = Http.json.encodeToString(current + sortOverrides.value)
-            }
-        }
-    }
-
-    /** The bookmarked member index for one list, if any. */
-    fun playlistBookmark(slug: String): Flow<Int?> =
-        bookmarkOverrides.map { it[slug] }
-
-    /** Remember or clear (null) a playlist's bookmark; memory is the truth, disk takes a snapshot of it. */
-    fun setPlaylistBookmark(slug: String, index: Int?) {
-        bookmarkOverrides.value = if (index == null) {
-            bookmarkOverrides.value - slug
-        } else {
-            bookmarkOverrides.value + (slug to index)
-        }
-        val snapshot = bookmarkOverrides.value
-        bookmarkPersist?.cancel()
-        bookmarkPersist = persist.launch {
-            context.settingsStore.edit { p ->
-                // Write the snapshot, never a union with disk: a union
-                // resurrects bookmarks that were just cleared after restart.
-                p[K.playlistBookmarks] = Http.json.encodeToString(snapshot)
             }
         }
     }

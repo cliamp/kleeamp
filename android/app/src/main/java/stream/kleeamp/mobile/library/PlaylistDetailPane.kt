@@ -114,16 +114,13 @@ import stream.kleeamp.mobile.theme.Mono
 import stream.kleeamp.mobile.prefs.PlaylistSort
 import stream.kleeamp.mobile.prefs.sortedStations
 
-/** Playlist maintenance: dedupe, missing-file purge and position bookmark. */
+/** Playlist maintenance: dedupe and missing-file purge. */
 @Composable
 private fun PlaylistToolsMenu(
     playlistName: String,
     state: PlaylistToolsState,
     onDedupe: () -> Unit,
     onPurgeMissing: () -> Unit,
-    onBookmarkCurrent: () -> Unit,
-    onGoBookmark: () -> Unit,
-    onClearBookmark: () -> Unit,
 ) {
     val p = LocalPalette.current
     var open by remember { mutableStateOf(false) }
@@ -148,35 +145,6 @@ private fun PlaylistToolsMenu(
                 )
             )
         }
-        if (state.canBookmark) {
-            add(
-                MenuAction(
-                    id = "bookmark",
-                    label = "bookmark current",
-                    subtitle = "mark the playing song",
-                    onClick = onBookmarkCurrent,
-                )
-            )
-        }
-        if (state.bookmarkIndex != null) {
-            add(
-                MenuAction(
-                    id = "gobookmark",
-                    label = "go to bookmark",
-                    subtitle = "play the marked song",
-                    tint = p.accent,
-                    onClick = onGoBookmark,
-                )
-            )
-            add(
-                MenuAction(
-                    id = "clearbookmark",
-                    label = "clear bookmark",
-                    subtitle = "forget the marked position",
-                    onClick = onClearBookmark,
-                )
-            )
-        }
     }
     if (actions.isEmpty()) return
     OverflowButton({ open = true }, size = 16)
@@ -195,8 +163,6 @@ private fun PlaylistToolsMenu(
 private data class PlaylistToolsState(
     val dupCount: Int,
     val missingCount: Int,
-    val bookmarkIndex: Int?,
-    val canBookmark: Boolean,
 )
 
 /** One user playlist as a navigation pane, with add-songs and cover editing. */
@@ -290,24 +256,9 @@ fun LibraryPlaylistPane(
                         state = PlaylistToolsState(
                             dupCount = ui.dupCount,
                             missingCount = ui.missingCount,
-                            bookmarkIndex = ui.bookmarkIndex,
-                            canBookmark = current != null &&
-                                ui.members.indexOfFirst { it.url == current.url } >= 0,
                         ),
                         onDedupe = { vm.onEvent(PlaylistDetailViewModel.Event.Dedupe) },
                         onPurgeMissing = { vm.onEvent(PlaylistDetailViewModel.Event.PurgeMissing) },
-                        onBookmarkCurrent = {
-                            val at = ui.members.indexOfFirst { it.url == current?.url }
-                            if (at >= 0) vm.onEvent(PlaylistDetailViewModel.Event.Bookmark(at))
-                        },
-                        onGoBookmark = {
-                            ui.bookmarkIndex?.let { idx ->
-                                ui.members.getOrNull(idx)?.let { onPlay(it, ui.members) }
-                            }
-                        },
-                        onClearBookmark = {
-                            vm.onEvent(PlaylistDetailViewModel.Event.Bookmark(null))
-                        },
                     )
                 }
             } else null,

@@ -25,6 +25,7 @@ import stream.kleeamp.mobile.library.PlaylistStore
 import stream.kleeamp.mobile.podcasts.PodcastRepository
 import stream.kleeamp.mobile.radio.RadioBrowser
 import stream.kleeamp.mobile.radio.RadioRepository
+import stream.kleeamp.mobile.radio.queueContinuation
 import stream.kleeamp.mobile.settings.Scrobbler
 import stream.kleeamp.mobile.playback.PlayerConnection
 import stream.kleeamp.mobile.widget.WidgetRenderer
@@ -83,6 +84,7 @@ class KleeampApp : Application() {
             autoResume = prefs.autoResume,
             resumeLocal = prefs.resumeLocal,
             resumePodcasts = prefs.resumePodcasts,
+            continuationForOrigin = { origin, offset -> radio.queueContinuation(origin, offset) },
         )
 
     /** Delete-after-listening for a naturally finished episode, per scope. */

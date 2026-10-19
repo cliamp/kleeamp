@@ -32,6 +32,7 @@ import stream.kleeamp.mobile.prefs.playSectionFor
 import stream.kleeamp.mobile.model.Station
 import stream.kleeamp.mobile.model.StationSource
 import stream.kleeamp.mobile.model.wrapNext
+import stream.kleeamp.mobile.play.QueueContinuation
 import stream.kleeamp.mobile.play.QueuePolicy
 import stream.kleeamp.mobile.play.RepeatMode
 import stream.kleeamp.mobile.player.shouldReportBuffering
@@ -128,6 +129,8 @@ class PlayerConnection(
     resumeLocal: Flow<Boolean> = flowOf(false),
     /** Episode resume switch, on by default. */
     resumePodcasts: Flow<Boolean> = flowOf(true),
+    /** Rebuilds a paged queue source from its persisted directory origin. */
+    private val continuationForOrigin: ((origin: String, offset: Int) -> QueueContinuation?)? = null,
 ) {
     private var controller: MediaController? = null
 
@@ -142,6 +145,7 @@ class PlayerConnection(
         onQueueRestored = { hasPrev, hasNext ->
             _state.value = _state.value.copy(hasPrev = hasPrev, hasNext = hasNext)
         },
+        continuationForOrigin = continuationForOrigin ?: { _, _ -> null },
     )
 
     val upNext: StateFlow<List<Station>> get() = queue.upNext
@@ -159,7 +163,11 @@ class PlayerConnection(
     internal fun peekAdjacent(): Pair<Station?, Station?> = queue.peekAdjacent()
     fun playUpNextEntry(index: Int) = queue.playUpNextEntry(index)
     fun playPanelEntry(panelPosition: Int) = queue.playPanelEntry(panelPosition)
-    fun play(station: Station, from: List<Station> = emptyList()) {
+    fun play(
+        station: Station,
+        from: List<Station> = emptyList(),
+        continuation: QueueContinuation? = null,
+    ) {
         // Each section keeps its own pace when switched on: apply it
         // synchronously so the media job (and every later transition) reads
         // the right speed. Off leaves the one app-wide speed alone.
@@ -169,8 +177,9 @@ class PlayerConnection(
             _speed.value = s
             controller?.setPlaybackSpeed(s)
         }
-        queue.play(station, from)
+        queue.play(station, from, continuation)
     }
+    fun loadMoreQueue() = queue.loadMore()
     fun toggleShuffle() = queue.toggleShuffle()
     fun toggleRepeat() = queue.toggleRepeat()
     fun next() = queue.next()

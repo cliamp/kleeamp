@@ -150,6 +150,10 @@ class Prefs(private val context: Context) {
         val queueIndex = intPreferencesKey("queue_index")
         /** True when [queue] holds the whole source, not just the window. */
         val queueFull = booleanPreferencesKey("queue_full")
+        /** Stable directory origin of a paged queue, empty for finite lists. */
+        val queueOrigin = stringPreferencesKey("queue_origin")
+        /** Next page offset inside [queueOrigin] when the queue was persisted. */
+        val queueOriginOffset = intPreferencesKey("queue_origin_offset")
         val downloads = stringPreferencesKey("downloads")
         val customTheme = stringPreferencesKey("custom_theme")
         val playlistSorts = stringPreferencesKey("playlist_sorts")  // slug -> PlaylistSort.ordinal
@@ -312,14 +316,29 @@ class Prefs(private val context: Context) {
     }
     val queueIndex: Flow<Int> = context.settingsStore.data.map { it[K.queueIndex] ?: 0 }
     val queueFull: Flow<Boolean> = context.settingsStore.data.map { it[K.queueFull] ?: false }
+    val queueOrigin: Flow<String> = context.settingsStore.data.map { it[K.queueOrigin].orEmpty() }
+    val queueOriginOffset: Flow<Int> = context.settingsStore.data.map { it[K.queueOriginOffset] ?: 0 }
 
     /** Write the queue window and position in one transaction so cold-boot
      * readers never see a list from one play with another's index. */
-    suspend fun setQueue(stations: List<Station>, index: Int, full: Boolean = false) {
+    suspend fun setQueue(
+        stations: List<Station>,
+        index: Int,
+        full: Boolean = false,
+        origin: String? = null,
+        originOffset: Int = 0,
+    ) {
         context.settingsStore.edit {
             it[K.queue] = Http.json.encodeToString(stations)
             it[K.queueIndex] = index
             it[K.queueFull] = full
+            if (origin.isNullOrEmpty()) {
+                it.remove(K.queueOrigin)
+                it.remove(K.queueOriginOffset)
+            } else {
+                it[K.queueOrigin] = origin
+                it[K.queueOriginOffset] = originOffset
+            }
         }
     }
     val custom: Flow<List<Station>> =

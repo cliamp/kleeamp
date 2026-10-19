@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -145,6 +146,7 @@ fun UpNextScreen(
             if (player.panelList.value == upNext) player.removePanelEntry(index)
         },
         onBack = onBack,
+        onLoadMore = player::loadMoreQueue,
     )
 }
 
@@ -163,6 +165,9 @@ internal fun UpNextContent(
     onClear: () -> Unit = {},
     canUndo: Boolean = false,
     onUndo: () -> Unit = {},
+    // Pulls the following catalogue page when the loaded rows run out, so a
+    // directory queue keeps filling as the sheet is scrolled to its end.
+    onLoadMore: () -> Unit = {},
     visualizer: String = "spectrum",
     generation: Int = 0,
     savedDurations: Map<String, Long> = emptyMap(),
@@ -181,6 +186,16 @@ internal fun UpNextContent(
     // the preview via sync instead of recreating it mid-drag.
     val drag = remember(listState) { UpNextDragState(listState, scope) }
     SideEffect { drag.sync(upNextEntries(upNext, activeIndex)) }
+    val nearEnd by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+            last >= info.totalItemsCount - 2
+        }
+    }
+    LaunchedEffect(nearEnd, upNext.size) {
+        if (nearEnd) onLoadMore()
+    }
     val latestOnMove by rememberUpdatedState(onMove)
     val haptics = LocalHapticFeedback.current
     val hapticsEnabled by rememberUpdatedState(LocalHapticsEnabled.current)

@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import stream.kleeamp.mobile.art.SeedPlate
 import stream.kleeamp.mobile.art.ArtResolve
 import stream.kleeamp.mobile.model.Station
+import stream.kleeamp.mobile.play.QueueContinuation
 import stream.kleeamp.mobile.chrome.rememberArt
 import stream.kleeamp.mobile.model.StationSource
 import stream.kleeamp.mobile.chrome.compact
@@ -82,7 +83,7 @@ fun StationsScreen(
     current: Station?,
     playing: Boolean,
     favorites: List<Station>,
-    onPlay: (Station, List<Station>) -> Unit,
+    onPlay: (Station, List<Station>, QueueContinuation?) -> Unit,
     onAddToQueue: (Station) -> Unit = {},
     onAddToPlaylist: (Station) -> Unit = {},
     onOpenSearch: () -> Unit = {},
@@ -332,7 +333,7 @@ fun StationsScreen(
                             playing = playing && rowActive,
                             onPlay = {
                                 if (channel?.hasTracks == true) onOpenChannel(s)
-                                else onPlay(s, cliamp)
+                                else onPlay(s, cliamp, null)
                             },
                             onOpenMenu = { menuFor = s },
                         )
@@ -368,7 +369,7 @@ fun StationsScreen(
                         station = s,
                         active = current?.url == s.url,
                         playing = playing && current?.url == s.url,
-                        onPlay = { onPlay(s, custom) },
+                        onPlay = { onPlay(s, custom, null) },
                         onOpenMenu = { menuFor = s },
                     )
                 }
@@ -376,6 +377,11 @@ fun StationsScreen(
 
             if (source == Source.All || source == Source.Directory) {
                 val dirStations = if (favOnly) favStations else directory.stations
+                // Directory rows keep catalogue paging alive in the player:
+                // next at the end of the loaded page asks this continuation for
+                // the following page, so playback never stops at one page.
+                val dirMore: QueueContinuation? =
+                    if (favOnly) null else vm.continuation(directory.query, dirStations.size)
                 item {
                     SectionLabel(
                         if (favOnly) {
@@ -483,7 +489,7 @@ fun StationsScreen(
                         station = s,
                         active = current?.url == s.url,
                         playing = playing && current?.url == s.url,
-                        onPlay = { onPlay(s, dirStations) },
+                        onPlay = { onPlay(s, dirStations, dirMore) },
                         onOpenMenu = { menuFor = s },
                     )
                 }

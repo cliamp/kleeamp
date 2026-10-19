@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import stream.kleeamp.mobile.KleeampApp
 import stream.kleeamp.mobile.prefs.Prefs
 import stream.kleeamp.mobile.model.Station
+import stream.kleeamp.mobile.play.QueueContinuation
 import stream.kleeamp.mobile.play.QueueModel
 import stream.kleeamp.mobile.play.QueuePolicy
 import stream.kleeamp.mobile.play.RepeatMode
@@ -54,6 +55,9 @@ internal class QueueController(
     private val currentSpeed: () -> Float,
     private val onSync: () -> Unit,
     private val onQueueRestored: (Boolean, Boolean) -> Unit,
+    /** Rebuilds a paged queue source from the origin persisted with it. */
+    private val continuationForOrigin: (origin: String, offset: Int) -> QueueContinuation? =
+        { _, _ -> null },
 ) {
     private val model = QueueModel()
     private val history = QueueHistory()
@@ -110,11 +114,18 @@ internal class QueueController(
     private suspend fun restoreQueue(prefs: Prefs) {
         val stored = prefs.queue.first()
         if (stored.isEmpty() || model.currentUpNext.isNotEmpty()) return
+        val origin = prefs.queueOrigin.first()
+        val originOffset = prefs.queueOriginOffset.first()
         if (prefs.queueFull.first()) {
             val idx = prefs.queueIndex.first().coerceIn(0, stored.lastIndex)
             model.source = stored
             model.baseSource = stored
             model.ringFallback = false
+            // Reattach the paged catalogue source this queue came from, so a
+            // restored station list keeps walking into its next page.
+            continuation = origin.takeIf { it.isNotEmpty() }
+                ?.let { continuationForOrigin(it, originOffset) }
+            sourceExhausted = false
             val w = model.rewindow(idx)
             PlaybackBus.publishStation(w.window.getOrNull(w.index))
             PlaybackBus.publishSource(stored)
@@ -124,7 +135,10 @@ internal class QueueController(
         }
         val idx = prefs.queueIndex.first().coerceIn(0, stored.lastIndex)
         // Windows restore as a fresh walking order: the next real play
-        // rebases onto its own list as before.
+        // rebases onto its own list as before. Their origin offset is gone,
+        // so they never pretend to have a continuation.
+        continuation = null
+        sourceExhausted = false
         model.restoreWindow(stored, idx)
         PlaybackBus.publishStation(stored[idx])
         PlaybackBus.publishSource(stored)
@@ -163,6 +177,15 @@ internal class QueueController(
     private var _navTimerJob: Job? = null
     private var _navPending: Int? = null
     private var _lastNavTapMs = 0L
+
+    /**
+     * Optional continuation for a paged source: called once when navigation
+     * reaches the tail of the currently loaded list, so a station directory
+     * can hand over its next page. Null for lists that end on their own.
+     */
+    private var continuation: QueueContinuation? = null
+    private var sourceExhausted = false
+    private var loadingSource = false
 
 
     /**
@@ -236,9 +259,20 @@ internal class QueueController(
             val abs = (model.windowBase + model.currentIndex)
                 .takeIf { model.currentIndex in q.indices }
                 ?.coerceIn(0, src.lastIndex) ?: 0
-            scope.launch { prefs.setQueue(src, abs, full = true) }
+            val paging = continuation
+            scope.launch {
+                prefs.setQueue(
+                    src,
+                    abs,
+                    full = true,
+                    origin = paging?.origin,
+                    originOffset = paging?.offset ?: 0,
+                )
+            }
             return
         }
+        // A clipped window cannot resume the paged source at the right offset,
+        // so drop the origin with it.
         val (combined, queueIndex) = model.persistWindow(q)
         scope.launch { prefs.setQueue(combined, queueIndex) }
     }
@@ -280,7 +314,13 @@ internal class QueueController(
      * rebuilt from the items that follow it in the list, in the list's order.
      * Manual Up next edits survive until the next list tap, never past it.
      */
-    fun play(station: Station, from: List<Station> = emptyList()) {
+    fun play(
+        station: Station,
+        from: List<Station> = emptyList(),
+        sourceContinuation: QueueContinuation? = null,
+    ) {
+        continuation = sourceContinuation
+        sourceExhausted = false
         startPlayback(station, from, preserveOrder = false)
     }
 
@@ -327,6 +367,51 @@ internal class QueueController(
         _navTimerJob = null
         _navPending = null
         bridge.cancelMedia()
+    }
+
+    /** True while the played list can still grow from its own next page. */
+    private fun hasSourceContinuation(): Boolean = continuation != null && !sourceExhausted
+
+    /**
+     * Fetches the played list's next page once, appends it to the walking
+     * order and then runs [onReady] (typically the navigation tap that asked
+     * for it). An empty or wholly duplicate page marks the source exhausted,
+     * so the tail stops asking.
+     */
+    private fun requestMoreSource(onReady: () -> Unit) {
+        val paging = continuation ?: return
+        if (loadingSource || sourceExhausted) return
+        loadingSource = true
+        scope.launch(Dispatchers.Main) {
+            val more = try {
+                paging.load()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // A failed page is not the end of the catalogue: leave the
+                // source open so the next tap retries instead of dead-ending.
+                loadingSource = false
+                return@launch
+            }
+            loadingSource = false
+            if (model.appendSource(more)) {
+                PlaybackBus.publishSource(model.source)
+                persistQueue()
+                onSync()
+            } else {
+                // The catalogue ran out. Drop the continuation so the origin
+                // is cleared from the persisted queue too.
+                sourceExhausted = true
+                continuation = null
+                persistQueue()
+            }
+            onReady()
+        }
+    }
+
+    /** Lets the Up Next list pull the next page when it reaches the end. */
+    fun loadMore() {
+        if (hasSourceContinuation()) requestMoreSource {}
     }
 
     /**
@@ -523,20 +608,14 @@ internal class QueueController(
         // collapsing onto the same song. Either way the value is an absolute
         // index into [model.source].
         val pending = _navPending
-        // The model records an explicit selection before Media3 finishes
-        // loading it. Prefer that occurrence over a first-URL match, which
-        // would rewind duplicate songs. Media3 and the bus are fallbacks for
-        // playback restored outside this session's queue.
-        val busUrl = PlaybackBus.station.value?.url
-        val liveHere = controller()?.let { c ->
-            if (c.mediaItemCount > 1) model.windowBase + c.currentMediaItemIndex else null
+        val here = resolvedHere(src)
+        // Next at the tail of a paged list pulls its following page first and
+        // then re-runs this tap, so the last visible station leads into the
+        // next directory page instead of dead-ending.
+        if (delta > 0 && tailNeedsNextPage(src, here)) {
+            requestMoreSource { step(delta) }
+            return
         }
-        val here = QueuePolicy.resolveHere(
-            pending,
-            QueuePolicy.modelHereIndex(model.windowBase, model.currentIndex, src, busUrl),
-            liveHere,
-            QueuePolicy.busHereIndex(src, busUrl),
-        )
         val mode = if (model.source.isEmpty() && pending == null) {
             val shown = (PlaybackBus.station.value ?: src.firstOrNull())?.let { s ->
                 src.indexOfFirst { it.url == s.url }
@@ -565,6 +644,30 @@ internal class QueueController(
             startNavTimer()
         }
     }
+
+    /**
+     * Absolute source position of the committed track. The model records an
+     * explicit selection before Media3 finishes loading it, so prefer that
+     * occurrence over a first-URL match (which would rewind duplicate songs);
+     * Media3's window and the bus remain fallbacks for playback restored
+     * outside this session's queue.
+     */
+    private fun resolvedHere(src: List<Station>): Int {
+        val busUrl = PlaybackBus.station.value?.url
+        val liveHere = controller()?.let { c ->
+            if (c.mediaItemCount > 1) model.windowBase + c.currentMediaItemIndex else null
+        }
+        return QueuePolicy.resolveHere(
+            _navPending,
+            QueuePolicy.modelHereIndex(model.windowBase, model.currentIndex, src, busUrl),
+            liveHere,
+            QueuePolicy.busHereIndex(src, busUrl),
+        )
+    }
+
+    /** True when a next tap would leave a paged source's loaded tail. */
+    private fun tailNeedsNextPage(src: List<Station>, here: Int): Boolean =
+        model.source.isNotEmpty() && here >= src.lastIndex && hasSourceContinuation()
 
     /**
      * Fires the pending target now (no timer). When the target is already one
@@ -800,7 +903,7 @@ internal class QueueController(
             return QueuePolicy.NavAvailability(hasPrev = true, hasNext = true)
         }
         val busUrl = PlaybackBus.station.value?.url ?: nav.firstOrNull()?.url
-        return QueuePolicy.navAvailability(
+        val available = QueuePolicy.navAvailability(
             model.source,
             model.fallback,
             model.ringFallback,
@@ -808,6 +911,9 @@ internal class QueueController(
             QueuePolicy.busHereIndex(nav, busUrl),
             QueuePolicy.Trail(history.size, history.index),
         )
+        // A paged source still has a next even when the loaded page ends, so
+        // the transport key stays enabled until the catalogue runs dry.
+        return if (hasSourceContinuation()) available.copy(hasNext = true) else available
     }
 
     /**
@@ -940,10 +1046,19 @@ internal class QueueController(
                 applyNavigation()
             }
             RepeatMode.Off -> {
-                if (model.windowBase + model.currentIndex < model.source.lastIndex) {
+                val abs = model.windowBase + model.currentIndex
+                if (abs < model.source.lastIndex) {
                     _navTimerJob?.cancel()
-                    _navPending = model.windowBase + model.currentIndex + 1
+                    _navPending = abs + 1
                     applyNavigation()
+                } else if (model.source.isNotEmpty() && hasSourceContinuation()) {
+                    // The audible item was the last of the loaded page: fetch
+                    // the following page, then walk into its first station.
+                    requestMoreSource {
+                        _navTimerJob?.cancel()
+                        _navPending = model.windowBase + model.currentIndex + 1
+                        applyNavigation()
+                    }
                 }
             }
         }

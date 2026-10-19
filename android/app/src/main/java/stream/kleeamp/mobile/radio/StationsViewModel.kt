@@ -6,8 +6,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import stream.kleeamp.mobile.common.stateInUi
-import stream.kleeamp.mobile.prefs.Prefs
 import stream.kleeamp.mobile.model.Station
+import stream.kleeamp.mobile.play.QueueContinuation
+import stream.kleeamp.mobile.prefs.Prefs
 
 class StationsViewModel(
     private val repository: RadioRepository,
@@ -122,4 +123,12 @@ class StationsViewModel(
             }
         }
     }
+
+    /**
+     * Player queue hook: a continuation that keeps fetching the pages after
+     * [query]'s already loaded rows. Null only for the favorites filter, which
+     * is a local list and has no catalogue page to ask for.
+     */
+    fun continuation(query: DirectoryQuery, offset: Int): QueueContinuation =
+        repository.queueContinuation(query, offset)
 }

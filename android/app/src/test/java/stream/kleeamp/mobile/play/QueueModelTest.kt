@@ -88,6 +88,46 @@ class QueueModelTest {
     }
 
     @Test
+    fun appendSourceExtendsWalkingOrderAndPanel() {
+        val model = QueueModel()
+        val first = list(3)
+        model.playFromList(first[0], first, preserveOrder = false, sourceIndex = null)
+        val added = listOf(station(3), station(4))
+        assertTrue(model.appendSource(added))
+        assertEquals((first + added).map { it.url }, model.source.map { it.url })
+        assertEquals(model.source.map { it.url }, model.baseSource.map { it.url })
+        assertEquals(model.source.map { it.url }, model.panelList.value.map { it.url })
+    }
+
+    @Test
+    fun appendSourceDropsDuplicatesAndRejectsEmpty() {
+        val model = QueueModel()
+        val first = list(3)
+        model.playFromList(first[0], first, preserveOrder = false, sourceIndex = null)
+        assertFalse(model.appendSource(emptyList()))
+        assertFalse(model.appendSource(listOf(station(2))))
+        assertTrue(model.appendSource(listOf(station(2), station(3))))
+        assertEquals(listOf("url-0", "url-1", "url-2", "url-3"), model.source.map { it.url })
+    }
+
+    @Test
+    fun appendSourceExtendsShuffledBaseOrderToo() {
+        val model = QueueModel()
+        val first = list(4)
+        model.playFromList(first[0], first, preserveOrder = false, sourceIndex = null)
+        model.setShuffled(true)
+        model.replaceOrder(listOf(first[2], first[0], first[3], first[1]), first)
+        assertTrue(model.appendSource(listOf(station(4), station(5))))
+        assertEquals(6, model.source.size)
+        // Turning shuffle off must still walk every paged station in the
+        // catalogue's natural order.
+        assertEquals(
+            (first + listOf(station(4), station(5))).map { it.url },
+            model.baseSource.map { it.url },
+        )
+    }
+
+    @Test
     fun replaceOrderSwapsWalkingLists() {
         val model = QueueModel()
         val base = list(4)

@@ -65,10 +65,10 @@ class QueueModel {
     val currentIndex: Int get() = _upNextIndex.value
 
     /**
-     * What the Up Next screen lists. Finite track lists (local files,
-     * episodes, provider albums, channel tracks) show the whole source so
-     * nothing queued reads as lost; live-mixed lists keep the bounded
-     * player window. The player itself always walks the window.
+     * What the Up Next screen lists. Any real source shows its whole walking
+     * order so nothing queued reads as lost; only a source-less restore falls
+     * back to the bounded player window. The player itself always walks the
+     * window.
      */
     private val _panelList = MutableStateFlow<List<Station>>(emptyList())
     val panelList: StateFlow<List<Station>> = _panelList.asStateFlow()
@@ -138,6 +138,26 @@ class QueueModel {
         _upNextIndex.value = w.index
         publishPanel()
         return w
+    }
+
+    /**
+     * Appends freshly paged stations to the walking order, de-duped by id,
+     * and refreshes the panel. Returns true when the source actually grew.
+     */
+    fun appendSource(stations: List<Station>): Boolean {
+        if (stations.isEmpty()) return false
+        val seen = source.mapTo(HashSet()) { it.id }
+        val added = stations.filter { seen.add(it.id) }
+        if (added.isEmpty()) return false
+        source = source + added
+        // Keep the unshuffled order whole as well, so turning shuffle off
+        // later still walks the newly paged stations.
+        if (baseSource.isNotEmpty()) {
+            val baseSeen = baseSource.mapTo(HashSet()) { it.id }
+            baseSource = baseSource + stations.filter { baseSeen.add(it.id) }
+        }
+        publishPanel()
+        return true
     }
 
     /** Replaces the walking order, e.g. after a shuffle rebuild. */

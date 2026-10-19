@@ -58,6 +58,7 @@ import stream.kleeamp.mobile.podcasts.PodcastShow
 import stream.kleeamp.mobile.radio.RadioRepository
 import stream.kleeamp.mobile.model.Station
 import stream.kleeamp.mobile.play.PlayFromList
+import stream.kleeamp.mobile.play.QueueContinuation
 import stream.kleeamp.mobile.playback.PlaybackBus
 import stream.kleeamp.mobile.playback.PlayerConnection
 import stream.kleeamp.mobile.chrome.KleeampTabBar
@@ -242,8 +243,8 @@ fun KleeampRoot(
         }
     }
 
-    val play = PlayFromList { s, from ->
-        player.play(s, from)
+    val play = PlayFromList { s, from, continuation ->
+        player.play(s, from, continuation)
         repository.reportPlay(s)
     }
     // A cliamp channel opens its track list wherever it is tapped -
@@ -255,7 +256,7 @@ fun KleeampRoot(
             c.id == s.slug && c.hasTracks && c.stream == s.url
         }
         if (channel != null) navController.navigate(CliampChannelRoute(channel.id))
-        else play(s, from)
+        else play(s, from, null)
     }
 
     // Move to a tab. Anything sitting above Home - a pane, Settings, Search -
@@ -436,7 +437,7 @@ fun KleeampRoot(
                                 prefs = prefs,
                                 current = station,
                                 playing = playerState.playing,
-                                onPlay = { s, from -> play(s, from) },
+                                onPlay = { s, from, continuation -> play(s, from, continuation) },
                                 onAddToQueue = { player.addToUpNext(it) },
                                 onAddToPlaylist = { s -> addToPlaylistStation = s },
                                 onOpenSearch = {
@@ -496,7 +497,7 @@ fun KleeampRoot(
                         current = station,
                         playing = playerState.playing,
                         onBack = { navController.popBackStack() },
-                        onPlay = { s, from -> play(s, from) },
+                        onPlay = { s, from -> play(s, from, null) },
                         onAddToUpNext = { player.addToUpNext(it) },
                         onPlayNext = { player.playNext(it) },
                         onAddToPlaylist = { s -> addToPlaylistStation = s },
@@ -516,7 +517,7 @@ fun KleeampRoot(
                         current = station,
                         playing = playerState.playing,
                         onBack = { navController.popBackStack() },
-                        onPlay = { s, from -> play(s, from) },
+                        onPlay = { s, from -> play(s, from, null) },
                         onAddToUpNext = { player.addToUpNext(it) },
                         onPlayNext = { player.playNext(it) },
                         onAddToPlaylist = { s -> addToPlaylistStation = s },
@@ -556,7 +557,7 @@ fun KleeampRoot(
                         accountId = songsAccountId,
                         current = station,
                         playing = playerState.playing,
-                        onPlay = { s, from -> play(s, from) },
+                        onPlay = { s, from -> play(s, from, null) },
                         onAddToQueue = { player.addToUpNext(it) },
                         onAddToPlaylist = { s -> addToPlaylistStation = s },
                         onInfo = { s -> navController.navigate(LibrarySongInfo(s.url)) },
@@ -740,7 +741,7 @@ fun KleeampRoot(
                     },
                     current = station,
                     playing = playerState.playing,
-                    onPlay = { s, from -> play(s, from) },
+                    onPlay = { s, from -> play(s, from, null) },
                     onOpenProvider = { account -> navController.navigate(LibraryProviderSongs(account.id)) },
                     onOpenShow = { show: PodcastShow ->
                         podcasts.openShow(show)
@@ -1105,7 +1106,7 @@ private fun StationsTab(
     prefs: Prefs,
     current: Station?,
     playing: Boolean,
-    onPlay: (Station, List<Station>) -> Unit,
+    onPlay: (Station, List<Station>, QueueContinuation?) -> Unit,
     onAddToQueue: (Station) -> Unit,
     onAddToPlaylist: (Station) -> Unit,
     onOpenSearch: () -> Unit,

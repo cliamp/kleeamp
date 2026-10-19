@@ -3,7 +3,7 @@ package stream.kleeamp.mobile.play
 import stream.kleeamp.mobile.model.Station
 
 fun interface PlayFromList {
-    operator fun invoke(item: Station, source: List<Station>)
+    operator fun invoke(item: Station, source: List<Station>, continuation: QueueContinuation?)
 }
 
 fun interface PlayNext {

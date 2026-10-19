@@ -22,6 +22,7 @@ import stream.kleeamp.mobile.art.StationArtSource
 import stream.kleeamp.mobile.model.Station
 import stream.kleeamp.mobile.model.StationSource
 import stream.kleeamp.mobile.net.retryFetch
+import stream.kleeamp.mobile.play.QueueContinuation
 import stream.kleeamp.mobile.prefs.Prefs
 
 /** How the directory list is currently ordered or filtered. */
@@ -40,6 +41,43 @@ sealed interface DirectoryQuery {
             is Tag -> "#$tag"
             is Country -> countryName.lowercase()
         }
+
+    /**
+     * Stable key persisted with the player queue so a restored queue can keep
+     * paging the same directory query after a restart. The separator cannot
+     * occur in a real search/tag/country value.
+     */
+    val originKey: String
+        get() = when (this) {
+            TopVoted -> "top"
+            Trending -> "trending"
+            is Search -> "search\u0000$text"
+            is Tag -> "tag\u0000$tag"
+            is Country -> "country\u0000$code"
+        }
+
+    companion object {
+        /** Parses an [originKey] written by an earlier process, or null. */
+        fun fromOriginKey(key: String): DirectoryQuery? {
+            val cut = key.indexOf('\u0000')
+            if (cut < 0) {
+                return when (key) {
+                    "top" -> TopVoted
+                    "trending" -> Trending
+                    else -> null
+                }
+            }
+            val kind = key.substring(0, cut)
+            val value = key.substring(cut + 1)
+            if (value.isEmpty()) return null
+            return when (kind) {
+                "search" -> Search(value)
+                "tag" -> Tag(value)
+                "country" -> Country(value.uppercase(), value)
+                else -> null
+            }
+        }
+    }
 }
 
 data class DirectoryState(
@@ -311,19 +349,7 @@ class RadioRepository(
                 // network answers, then let the live page replace it.
                 if (reset) restore(query)
 
-                val page = runCatching {
-                    withTimeoutOrNull(directoryTimeoutMs) {
-                        retryFetch {
-                            when (query) {
-                                DirectoryQuery.TopVoted -> RadioBrowser.topVoted(offset, pageSize)
-                                DirectoryQuery.Trending -> RadioBrowser.trending(offset, pageSize)
-                                is DirectoryQuery.Search -> RadioBrowser.searchByName(query.text, offset, pageSize)
-                                is DirectoryQuery.Tag -> RadioBrowser.byTag(query.tag, offset, pageSize)
-                                is DirectoryQuery.Country -> RadioBrowser.byCountryCode(query.code, offset, pageSize)
-                            }
-                        }
-                    } ?: throw IOException("directory timed out")
-                }
+                val page = runCatching { fetchPage(query, offset) }
                 // A superseding tap cancelled this load: leave the state alone,
                 // the newer load owns the UI now.
                 if (page.exceptionOrNull() is CancellationException) return@withLock
@@ -363,6 +389,20 @@ class RadioRepository(
             }
         }
     }
+
+    /** One page of [query] at [offset], retried inside the directory timeout. */
+    internal suspend fun fetchPage(query: DirectoryQuery, offset: Int): List<Station> =
+        withTimeoutOrNull(directoryTimeoutMs) {
+            retryFetch {
+                when (query) {
+                    DirectoryQuery.TopVoted -> RadioBrowser.topVoted(offset, pageSize)
+                    DirectoryQuery.Trending -> RadioBrowser.trending(offset, pageSize)
+                    is DirectoryQuery.Search -> RadioBrowser.searchByName(query.text, offset, pageSize)
+                    is DirectoryQuery.Tag -> RadioBrowser.byTag(query.tag, offset, pageSize)
+                    is DirectoryQuery.Country -> RadioBrowser.byCountryCode(query.code, offset, pageSize)
+                }
+            }
+        } ?: throw IOException("directory timed out")
 
     /** The last first-page snapshot of [query], or nothing the first time. */
     private suspend fun restore(query: DirectoryQuery) {
@@ -462,3 +502,16 @@ class RadioRepository(
     }
 
 }
+
+/**
+ * Builds a player-queue continuation for [query] starting at [offset]. The
+ * queue owns the offset, not the directory list, so manual queue edits (or a
+ * queue restored before the directory finished loading) never skip or repeat
+ * a page.
+ */
+fun RadioRepository.queueContinuation(query: DirectoryQuery, offset: Int): QueueContinuation =
+    QueueContinuation(query.originKey, offset) { at -> fetchPage(query, at) }
+
+/** Rebuilds a paged queue source from an origin persisted before a restart. */
+fun RadioRepository.queueContinuation(origin: String, offset: Int): QueueContinuation? =
+    DirectoryQuery.fromOriginKey(origin)?.let { queueContinuation(it, offset) }

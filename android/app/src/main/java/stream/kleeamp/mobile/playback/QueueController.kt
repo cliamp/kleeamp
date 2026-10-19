@@ -232,7 +232,8 @@ internal class QueueController(
         if (q.isEmpty()) return
         val prefs = (context.applicationContext as KleeampApp).prefs
         val src = model.source
-        if (src.isNotEmpty() && src.size <= FULL_SOURCE_PERSIST_CAP && src.all { it.isTrack }) {
+        if (src.isNotEmpty() && src.size <= FULL_SOURCE_PERSIST_CAP &&
+            (src.all { it.isTrack } || src.all { !it.isTrack })) {
             val abs = (model.windowBase + model.currentIndex)
                 .takeIf { model.currentIndex in q.indices }
                 ?.coerceIn(0, src.lastIndex) ?: 0
@@ -263,7 +264,7 @@ internal class QueueController(
      */
     fun playPanelEntry(panelPosition: Int) {
         val src = model.source
-        val abs = if (src.isNotEmpty() && src.all { it.isTrack }) {
+        val abs = if (src.isNotEmpty() && (src.all { it.isTrack } || src.all { !it.isTrack })) {
             if (panelPosition !in src.indices) return
             panelPosition
         } else {
@@ -683,7 +684,7 @@ internal class QueueController(
     /** Drop the panel position, keeping the playing item stable. */
     fun removePanelEntry(panelPosition: Int) {
         val src = model.source
-        if (src.isNotEmpty() && src.all { it.isTrack }) {
+        if (src.isNotEmpty() && (src.all { it.isTrack } || src.all { !it.isTrack })) {
             if (panelPosition !in src.indices) return
             val base = model.windowBase
             val size = model.currentUpNext.size
@@ -742,7 +743,7 @@ internal class QueueController(
      */
     fun movePanelEntry(fromAbs: Int, toAbs: Int) {
         val src = model.source
-        if (src.isEmpty() || !src.all { it.isTrack }) {
+        if (src.isEmpty() || !(src.all { it.isTrack } || src.all { !it.isTrack })) {
             val base = model.windowBase
             val size = model.currentUpNext.size
             if (fromAbs in base until base + size && toAbs in base until base + size) {

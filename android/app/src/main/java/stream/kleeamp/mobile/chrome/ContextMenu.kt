@@ -85,6 +85,7 @@ data class MenuSubject(
     val downloadPaused: Boolean = false,
     val downloadFailed: Boolean = false,
     val playedDone: Boolean = false,
+    val playedAll: Boolean = false,
     val infoAvailable: Boolean = false,
     val destructive: DestructiveAction? = null,
     val onPlayNext: (() -> Unit)? = null,
@@ -98,6 +99,7 @@ data class MenuSubject(
     val onRemoveDownload: (() -> Unit)? = null,
     val onMarkPlayed: (() -> Unit)? = null,
     val onForgetPlayed: (() -> Unit)? = null,
+    val onToggleAllPlayed: (() -> Unit)? = null,
     val onInfo: (() -> Unit)? = null,
     val onToggleSubscribe: (() -> Unit)? = null,
     val onDownloadAll: (() -> Unit)? = null,
@@ -134,6 +136,21 @@ fun menuActions(s: MenuSubject): List<MenuAction> {
                         icon = KleeampIcons.Download,
                         tint = p.accent,
                         onClick = downloadAll,
+                    ),
+                )
+            }
+            s.onToggleAllPlayed?.let { toggle ->
+                add(
+                    MenuAction(
+                        id = "played-all",
+                        label = if (s.playedAll) "Mark All Unplayed" else "Mark All Played",
+                        subtitle = if (s.playedAll) {
+                            "clear every finished mark"
+                        } else {
+                            "remember every episode as finished"
+                        },
+                        icon = if (s.playedAll) KleeampIcons.Xmark else KleeampIcons.Check,
+                        onClick = toggle,
                     ),
                 )
             }

@@ -2,9 +2,12 @@ package stream.kleeamp.mobile.podcasts
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import stream.kleeamp.mobile.common.stateInUi
@@ -32,6 +35,8 @@ class PodcastsViewModel(
         data class Load(val query: PodcastQuery) : Event
         data class ToggleSubscription(val show: PodcastShow) : Event
         data class DownloadAll(val show: PodcastShow) : Event
+        data class LoadShowPlayed(val show: PodcastShow) : Event
+        data class SetAllPlayed(val show: PodcastShow, val played: Boolean) : Event
     }
 
     val state: StateFlow<UiState> = combine(
@@ -58,6 +63,10 @@ class PodcastsViewModel(
             subscriptions = emptyList(),
         ),
     )
+
+    /** Shows whose cached episodes are all finished, for the show-menu toggle. */
+    private val _playedShows = MutableStateFlow<Set<String>>(emptySet())
+    val playedShows: StateFlow<Set<String>> = _playedShows.asStateFlow()
 
     fun onEvent(e: Event) {
         when (e) {
@@ -96,6 +105,32 @@ class PodcastsViewModel(
                         }
                     }?.episodes.orEmpty()
                     if (landed.isNotEmpty()) downloads.downloadAll(e.show, landed)
+                }
+            }
+            // The show menu opens without network: cached episodes are enough
+            // to decide whether every mark is already there.
+            is Event.LoadShowPlayed -> viewModelScope.launch {
+                val episodes = podcasts.cachedEpisodesFor(e.show)
+                val progress = podcasts.progress.first()
+                val all = episodes.isNotEmpty() && episodes.all {
+                    progress[it.toStation(e.show).url]?.completed == true
+                }
+                _playedShows.update { urls ->
+                    if (all) urls + e.show.feedUrl else urls - e.show.feedUrl
+                }
+            }
+            is Event.SetAllPlayed -> viewModelScope.launch {
+                val episodes = podcasts.allEpisodes(e.show)
+                if (episodes.isEmpty()) return@launch
+                val stations = episodes.map { it.toStation(e.show) }
+                if (e.played) {
+                    podcasts.markAllCompleted(stations)
+                    downloads.removePlayed(prefs.cleanupPlayed.first(), stations)
+                } else {
+                    podcasts.clearAllProgress(stations)
+                }
+                _playedShows.update { urls ->
+                    if (e.played) urls + e.show.feedUrl else urls - e.show.feedUrl
                 }
             }
         }

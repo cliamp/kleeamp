@@ -31,6 +31,7 @@ class PodcastShowViewModel(
         data class ToggleFavorite(val station: Station) : Event
         data object RefreshShow : Event
         data class MarkCompleted(val station: Station) : Event
+        data class SetAllPlayed(val played: Boolean) : Event
         data class ClearProgress(val station: Station) : Event
         data class Download(val station: Station) : Event
         data class CancelDownload(val url: String) : Event
@@ -101,7 +102,18 @@ class PodcastShowViewModel(
             is Event.RefreshShow -> podcasts.refreshShow()
             is Event.MarkCompleted -> viewModelScope.launch {
                 podcasts.markCompleted(e.station)
-                maybeCleanupDownload(e.station.url)
+                cleanupPlayed(listOf(e.station))
+            }
+            is Event.SetAllPlayed -> viewModelScope.launch {
+                val show = state.value.showState.show ?: return@launch
+                val stations = state.value.showState.episodes.map { it.toStation(show) }
+                if (stations.isEmpty()) return@launch
+                if (e.played) {
+                    podcasts.markAllCompleted(stations)
+                    cleanupPlayed(stations)
+                } else {
+                    podcasts.clearAllProgress(stations)
+                }
             }
             is Event.ClearProgress -> viewModelScope.launch {
                 podcasts.clearProgress(e.station)
@@ -130,13 +142,11 @@ class PodcastShowViewModel(
     }
 
     /**
-     * Delete-after-listening for an explicitly finished episode. The player
+     * Delete-after-listening for explicitly finished episodes. The player
      * path (progress near the end) runs through KleeampApp's progress sink
      * instead; both read the same scope.
      */
-    private suspend fun maybeCleanupDownload(url: String) {
-        val scope = prefs.cleanupPlayed.first()
-        val auto = downloads.entries.value[url]?.auto ?: return
-        if (scope.covers(auto)) downloads.remove(url)
+    private suspend fun cleanupPlayed(stations: List<Station>) {
+        downloads.removePlayed(prefs.cleanupPlayed.first(), stations)
     }
 }

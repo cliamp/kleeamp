@@ -93,6 +93,7 @@ fun PodcastsScreen(
     val scope = rememberCoroutineScope()
     var pane by rememberSaveable { mutableStateOf(Pane.All) }
     val ui by vm.state.collectAsState()
+    val playedShows by vm.playedShows.collectAsState()
     val subsGrid = ui.subsGrid
     val podDirectoryGrid = ui.podDirectoryGrid
 
@@ -116,6 +117,10 @@ fun PodcastsScreen(
     val subscribedFeeds = remember(subscriptions) { subscriptions.mapTo(HashSet()) { it.feedUrl } }
     // The show menu's subject: set by the ⋮ trigger, cleared on dismiss.
     var menuShow by remember { mutableStateOf<PodcastShow?>(null) }
+    // Refresh the toggle's state from cached episodes whenever the menu opens.
+    LaunchedEffect(menuShow?.feedUrl) {
+        menuShow?.let { vm.onEvent(PodcastsViewModel.Event.LoadShowPlayed(it)) }
+    }
     // The country picker: a bottom sheet, not the old dropdown menu.
     var countrySheet by remember { mutableStateOf(false) }
 
@@ -296,11 +301,20 @@ fun PodcastsScreen(
                         MenuSubject(
                             kind = MenuKind.SHOW,
                             subscribed = subscribed,
+                            playedAll = show.feedUrl in playedShows,
                             onToggleSubscribe = {
                                 vm.onEvent(PodcastsViewModel.Event.ToggleSubscription(show))
                             },
                             onDownloadAll = {
                                 vm.onEvent(PodcastsViewModel.Event.DownloadAll(show))
+                            },
+                            onToggleAllPlayed = {
+                                vm.onEvent(
+                                    PodcastsViewModel.Event.SetAllPlayed(
+                                        show,
+                                        show.feedUrl !in playedShows,
+                                    ),
+                                )
                             },
                         ),
                     ),

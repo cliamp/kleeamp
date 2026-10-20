@@ -278,8 +278,16 @@ interface PodcastDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveProgress(row: EpisodeProgressEntity)
 
+    /** One transaction for a show-wide mark, instead of a write per episode. */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveProgress(rows: List<EpisodeProgressEntity>)
+
     @Query("DELETE FROM episode_progress WHERE url = :url")
     suspend fun clearProgress(url: String)
+
+    /** One transaction for a show-wide unmark, instead of a delete per episode. */
+    @Query("DELETE FROM episode_progress WHERE url IN (:urls)")
+    suspend fun clearProgress(urls: List<String>)
 
     /** Legacy file:// rows, for the content-uri migration. */
     @Query("SELECT url FROM episode_progress WHERE url LIKE 'file://%'")

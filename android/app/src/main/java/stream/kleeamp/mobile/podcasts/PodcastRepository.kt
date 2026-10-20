@@ -458,6 +458,10 @@ private var chartCursor: List<String> = emptyList()
         return retryFetch { loadFeed(show) }.getOrNull()?.episodes ?: emptyList()
     }
 
+    /** Cached episodes only; no network, for deciding a show-menu toggle. */
+    suspend fun cachedEpisodesFor(show: PodcastShow): List<PodcastEpisode> =
+        cachedEpisodes(show).map { it.second }
+
     /** One subscribed show's cached episodes, empty on any miss or bad payload. */
     private suspend fun cachedEpisodes(show: PodcastShow): List<Pair<PodcastShow, PodcastEpisode>> {
         val row = cache.getFeed(show.feedUrl) ?: return emptyList()
@@ -512,6 +516,38 @@ private var chartCursor: List<String> = emptyList()
                 updatedAt = System.currentTimeMillis(),
             )
         )
+    }
+
+    /**
+     * Finish every episode of one show at once. The feed's episode list is the
+     * caller's, so subscriptions that were never opened cost no fetch here.
+     */
+    suspend fun markAllCompleted(stations: List<Station>) {
+        val now = System.currentTimeMillis()
+        val rows = stations.asSequence()
+            .filter { it.isTrack && it.url.isNotBlank() }
+            .distinctBy { it.url }
+            .map {
+                EpisodeProgressEntity(
+                    url = it.url,
+                    positionMs = it.durationMs,
+                    durationMs = it.durationMs,
+                    completed = true,
+                    updatedAt = now,
+                )
+            }
+            .toList()
+        if (rows.isNotEmpty()) dao.saveProgress(rows)
+    }
+
+    /** Clear the finished mark for every episode of one show at once. */
+    suspend fun clearAllProgress(stations: List<Station>) {
+        val urls = stations.asSequence()
+            .filter { it.isTrack && it.url.isNotBlank() }
+            .map { it.url }
+            .distinct()
+            .toList()
+        if (urls.isNotEmpty()) dao.clearProgress(urls)
     }
 
     suspend fun clearProgress(station: Station) = dao.clearProgress(station.url)

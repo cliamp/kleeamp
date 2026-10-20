@@ -112,6 +112,11 @@ fun PodcastShowScreen(
     val queue = remember(state.episodes, show?.feedUrl) {
         show?.let { s -> state.episodes.map { it.toStation(s) } } ?: emptyList()
     }
+    // The show-wide toggle is on only when every episode is finished;
+    // tapping it then clears the marks again.
+    val allPlayed = remember(queue, progress) {
+        queue.isNotEmpty() && queue.all { progress[it.url]?.completed == true }
+    }
     // Warm episode thumbs (URL-keyed, exactly as EpisodeRow reads them).
     LaunchedEffect(queue) {
         ArtResolve.prefetchSmallUrls(queue.mapNotNull { it.cover.takeIf { u -> u.startsWith("http") } })
@@ -234,10 +239,24 @@ fun PodcastShowScreen(
                 } else {
                     item {
                         SectionLabel("episodes — ${queue.size}") {
-                            RefreshIcon(
-                                loading = state.loading,
-                                onRefresh = { vm.onEvent(PodcastShowViewModel.Event.RefreshShow) },
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Chip(
+                                    if (allPlayed) "all played" else "mark all played",
+                                    selected = allPlayed,
+                                    onClick = {
+                                        vm.onEvent(
+                                            PodcastShowViewModel.Event.SetAllPlayed(!allPlayed),
+                                        )
+                                    },
+                                )
+                                RefreshIcon(
+                                    loading = state.loading,
+                                    onRefresh = { vm.onEvent(PodcastShowViewModel.Event.RefreshShow) },
+                                )
+                            }
                         }
                     }
                 }

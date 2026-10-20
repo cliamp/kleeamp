@@ -85,6 +85,17 @@ enum class CleanupScope(val key: String) {
     }
 }
 
+/**
+ * Drop the downloads [scope] covers after [stations] were marked played.
+ * Callers read the pref once, so a show-wide mark costs one settings read.
+ */
+suspend fun DownloadStore.removePlayed(scope: CleanupScope, stations: List<Station>) {
+    stations.forEach { station ->
+        val auto = entries.value[station.url]?.auto ?: return@forEach
+        if (scope.covers(auto)) remove(station.url)
+    }
+}
+
 /** In-flight fetch identity: what to show in the queue and how to retry it. [seq] is the queue sequence, so rows read in episode order. */
 internal data class DlMeta(val station: Station, val auto: Boolean, val seq: Long)
 

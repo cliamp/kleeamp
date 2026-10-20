@@ -20,12 +20,22 @@ import stream.kleeamp.mobile.db.KvCacheEntity
 import stream.kleeamp.mobile.db.PodcastDao
 import stream.kleeamp.mobile.db.PodcastFeedCacheEntity
 import stream.kleeamp.mobile.db.PodcastSubscriptionEntity
+import stream.kleeamp.mobile.model.Station
+import stream.kleeamp.mobile.model.StationSource
 import stream.kleeamp.mobile.net.Http
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PodcastRepositoryTest {
     private val showA = PodcastShow("a", "Show A", "https://example.com/a.xml")
     private val showB = PodcastShow("b", "Show B", "https://example.com/b.xml")
+
+    private fun station(url: String, durationMs: Long = 60_000L) = Station(
+        id = "pod:test:$url",
+        name = url,
+        url = url,
+        source = StationSource.Podcast,
+        durationMs = durationMs,
+    )
 
     @Test
     fun lateSuccessCannotReplaceTheNewerShow() = runTest {
@@ -364,14 +374,48 @@ class PodcastRepositoryTest {
         override suspend fun saveProgress(row: EpisodeProgressEntity) {
             savedRows[row.url] = row
         }
+        override suspend fun saveProgress(rows: List<EpisodeProgressEntity>) {
+            rows.forEach { savedRows[it.url] = it }
+        }
         override suspend fun clearProgress(url: String) {
             savedRows.remove(url)
+        }
+        override suspend fun clearProgress(urls: List<String>) {
+            urls.forEach { savedRows.remove(it) }
         }
         override suspend fun fileUrls(): List<String> =
             savedRows.keys.filter { it.startsWith("file://") }
         override suspend fun rekey(oldUrl: String, newUrl: String) {
             savedRows.remove(oldUrl)?.let { savedRows[newUrl] = it.copy(url = newUrl) }
         }
+    }
+
+    @Test
+    fun markAllCompletedWritesEveryEpisodeOnce() = runTest {
+        val dao = FakePodcasts()
+        val repository = PodcastRepository(backgroundScope, dao, FakeCache())
+        repository.markAllCompleted(
+            listOf(
+                station("a", 120_000L),
+                station("a", 120_000L),
+                station("b", 0L),
+            ),
+        )
+        assertEquals(2, dao.savedRows.size)
+        assertEquals(120_000L, dao.savedRows["a"]?.positionMs)
+        assertTrue(dao.savedRows["a"]?.completed == true)
+        assertEquals(0L, dao.savedRows["b"]?.positionMs)
+        assertTrue(dao.savedRows["b"]?.completed == true)
+    }
+
+    @Test
+    fun clearAllProgressRemovesEveryEpisodeOnce() = runTest {
+        val dao = FakePodcasts()
+        val repository = PodcastRepository(backgroundScope, dao, FakeCache())
+        val stations = listOf(station("a"), station("b"))
+        repository.markAllCompleted(stations)
+        repository.clearAllProgress(stations + station("a"))
+        assertTrue(dao.savedRows.isEmpty())
     }
 
     @Test

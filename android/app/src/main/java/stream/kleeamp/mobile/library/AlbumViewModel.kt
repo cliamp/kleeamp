@@ -14,9 +14,11 @@ import stream.kleeamp.mobile.prefs.Prefs
  * Context "local-songs" scopes to the on-device library; otherwise the
  * source is exactly that user playlist's resolved members. The album is
  * keyed by album + album artist so compilations stay one album while
- * same-named albums from different album artists stay apart. Matching is
- * case-insensitive so the detail agrees with the lowercased list key.
- * Songs play in disc/track order.
+ * same-named albums from different album artists stay apart. A non-blank
+ * [artist] narrows it further when the album was opened from an artist page,
+ * so a generic album tag shared by many singers cannot leak their tracks in.
+ * Matching is case-insensitive so the detail agrees with the lowercased list
+ * key. Songs play in disc/track order.
  */
 class AlbumViewModel(
     val album: String,
@@ -25,6 +27,7 @@ class AlbumViewModel(
     private val localLibrary: LocalLibrary,
     private val playlists: PlaylistStore,
     private val prefs: Prefs,
+    private val artist: String = "",
 ) : ViewModel() {
     data class UiState(
         val songs: List<Station> = emptyList(),
@@ -46,12 +49,8 @@ class AlbumViewModel(
             playlists.resolveMembers(it.songIds, songs)
         }.orEmpty()
         val source = if (context == "local-songs") songs else members
-        val wantAlbum = album.ifBlank { "unknown album" }
         val mine = source.distinctBy { it.id }
-            .filter {
-                it.album.ifBlank { "unknown album" }.equals(wantAlbum, ignoreCase = true) &&
-                    it.albumArtist.equals(albumArtist, ignoreCase = true)
-            }
+            .filter { it.matchesAlbum(album, albumArtist, artist) }
             .sortedWith(
                 compareBy<Station> { it.discNo }.thenBy { it.trackNo }.thenBy { it.name.lowercase() },
             )
@@ -68,3 +67,13 @@ class AlbumViewModel(
         }
     }
 }
+
+/**
+ * Whether a song belongs to the album page's key. A non-blank [artist] also
+ * requires that browse-artist attribution, so an album opened from an artist
+ * page cannot pull in other singers that share a generic album tag.
+ */
+internal fun Station.matchesAlbum(album: String, albumArtist: String, artist: String = ""): Boolean =
+    this.album.ifBlank { "unknown album" }.equals(album.ifBlank { "unknown album" }, ignoreCase = true) &&
+        this.albumArtist.equals(albumArtist, ignoreCase = true) &&
+        (artist.isBlank() || browseArtistName().equals(artist, ignoreCase = true))

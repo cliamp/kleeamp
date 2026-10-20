@@ -14,8 +14,8 @@ import stream.kleeamp.mobile.prefs.Prefs
  * Context "local-songs" scopes to the on-device library; otherwise the
  * source is exactly that user playlist's resolved members. Songs by the
  * same artist outside that list are never merged in. One song lives under
- * exactly one artist (track artist, else album artist, else unknown), so a
- * track never shows under two names.
+ * exactly one artist (album artist, else primary track artist, else unknown),
+ * so a track never shows under two names.
  */
 class ArtistViewModel(
     val artist: String,
@@ -45,25 +45,13 @@ class ArtistViewModel(
         // device library for "local-songs", otherwise that playlist's
         // own members. Never union the two. Case-insensitive so "daft punk"
         // and "Daft Punk" stay one artist, like the albums list. Single
-        // attribution (track, else album artist, else unknown) so one song
-        // never lands under two names.
+        // attribution (album artist, else primary track artist, else unknown)
+        // so one song never lands under two names.
         val source = if (context == "local-songs") songs else members
         val want = artist.ifBlank { "unknown artist" }
         val mine = source.distinctBy { it.id }
-            .filter { s ->
-                val effective = when {
-                    s.artist.isNotBlank() -> s.artist
-                    s.albumArtist.isNotBlank() -> s.albumArtist
-                    else -> "unknown artist"
-                }
-                effective.equals(want, ignoreCase = true)
-            }
-            .sortedWith(
-                compareBy<Station> { it.album.lowercase() }
-                    .thenBy { it.discNo }
-                    .thenBy { it.trackNo }
-                    .thenBy { it.name.lowercase() },
-            )
+            .filter { it.browseArtistName().equals(want, ignoreCase = true) }
+            .sortedWith(artistTrackOrder)
         UiState(songs = mine, favorites = favorites)
     }.stateInUi(viewModelScope, UiState())
 

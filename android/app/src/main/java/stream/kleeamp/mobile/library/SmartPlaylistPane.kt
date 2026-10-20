@@ -135,7 +135,7 @@ fun LibrarySmartPlaylistPane(
     /** Saved positions by station URL, for the resume readout on local rows. */
     progress: Map<String, EpisodeProgress> = emptyMap(),
     onAddToPlaylist: (Station) -> Unit = {},
-    onOpenArtist: (String) -> Unit = {},
+    onOpenArtist: (String, String) -> Unit = { _, _ -> },
     onOpenAlbum: (String, String) -> Unit = { _, _ -> },
     /** Opens the add-songs sheet over this page; the sheet writes per tap. */
     onOpenAddSongs: () -> Unit = {},
@@ -566,7 +566,7 @@ private fun SmartPlaylistDetail(
     /** Null when the user never picked a sort: downloads read in episode order. */
     sort: PlaylistSort? = null,
     tab: LocalSongsTab = LocalSongsTab.Songs,
-    onOpenArtist: (String) -> Unit = {},
+    onOpenArtist: (String, String) -> Unit = { _, _ -> },
     onOpenAlbum: (String, String) -> Unit = { _, _ -> },
     fetchedBytes: Map<String, Long> = emptyMap(),
     /** Finished files by URL: carries the queue ticket the finished list sorts by. */
@@ -793,11 +793,11 @@ private fun SmartPlaylistDetail(
         } else if (isLocalSongs && tab == LocalSongsTab.Artists && ordered.isNotEmpty()) {
             items(artists, key = { it.key }) { group ->
                 ListRow(
-                    onClick = { onOpenArtist(group.name) },
+                    onClick = { onOpenArtist(group.name, group.coverSong?.url.orEmpty()) },
                     verticalPadding = 9.dp,
                     leading = {
                         GroupArt(
-                            songs = group.songs,
+                            songs = listOfNotNull(group.coverSong),
                             modifier = Modifier.size(40.dp),
                             fallbackKey = group.key,
                             fallbackName = group.name,

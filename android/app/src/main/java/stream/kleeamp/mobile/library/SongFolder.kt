@@ -116,27 +116,80 @@ fun List<Station>.matching(query: String): List<Station> {
     }
 }
 
+/**
+ * Puts an artist row's cover song at the front of the artist page header
+ * list, so the header wears the same image the row did. A blank or absent
+ * [coverUrl] leaves the list untouched.
+ */
+fun artistHeaderSongs(songs: List<Station>, coverUrl: String): List<Station> =
+    if (coverUrl.isBlank()) songs else songs.sortedByDescending { it.url == coverUrl }
+
+/** Album/disc/track order shared by artist pages and the row cover pick. */
+val artistTrackOrder: Comparator<Station> =
+    compareBy<Station> { it.album.lowercase() }
+        .thenBy { it.discNo }
+        .thenBy { it.trackNo }
+        .thenBy { it.name.lowercase() }
+
 /** One artist and their songs for the browse view, artists by name. */
 data class ArtistGroup(val name: String, val songs: List<Station>) {
     /** Stable key for LazyColumn: artist name, lowercased. */
     val key: String get() = name.lowercase()
+
+    /**
+     * The artist's first track in album order: the cover both the browse row
+     * and the artist page header wear, so the two never disagree.
+     */
+    val coverSong: Station? get() = songs.minWithOrNull(artistTrackOrder)
 }
+
+/**
+ * Collaboration markers in a track-artist string. Only used when no album
+ * artist is tagged, and split at the first marker so "Artist A, Artist B"
+ * files under "Artist A" instead of becoming its own combination row.
+ */
+private val artistCreditSplit = Regex(
+    """\s*[,;]\s*|\s+(?:feat\.?|ft\.?|featuring)\s+""",
+    RegexOption.IGNORE_CASE,
+)
+
+/**
+ * The first credited artist from a combined track-artist string. Bands whose
+ * names contain "&" or "+" are left whole, because those are names rather
+ * than a featured-artist credit.
+ */
+private fun String.primaryArtistCredit(): String {
+    val credit = trim()
+    if (credit.isEmpty()) return credit
+    if (('&' in credit || '+' in credit) &&
+        !Regex("""\b(?:feat\.?|ft\.?|featuring)\b""", RegexOption.IGNORE_CASE).containsMatchIn(credit)
+    ) {
+        return credit
+    }
+    return credit.split(artistCreditSplit, limit = 2).first().trim().ifBlank { credit }
+}
+
+/**
+ * The artist a song is filed under for browse: the album-artist tag when set,
+ * otherwise the primary track artist, otherwise "unknown artist". Using the
+ * album artist keeps a compilation on one row instead of one row per
+ * featured-artist combination; the primary-credit fallback does the same for
+ * files whose album-artist tag is missing.
+ */
+fun Station.browseArtistName(): String =
+    albumArtist.trim().ifBlank { artist.primaryArtistCredit() }.ifBlank { "unknown artist" }
 
 /**
  * Groups songs by artist for browse. One row per artist, so a song never
  * shows twice; songs keep the incoming order. Case variants merge under the
- * first-seen spelling, and a blank track artist falls back to the album
+ * first-seen spelling, and an untagged album artist falls back to the track
  * artist before "unknown artist".
  */
 fun artistsOf(songs: List<Station>): List<ArtistGroup> {
     val byKey = LinkedHashMap<String, MutableList<Station>>()
     val display = LinkedHashMap<String, String>()
     songs.forEach { s ->
-        val name = when {
-            s.artist.isNotBlank() -> s.artist
-            s.albumArtist.isNotBlank() -> s.albumArtist
-            else -> "unknown artist"
-        }
+        val name = s.browseArtistName()
         val key = name.lowercase()
         display.putIfAbsent(key, name)
         val list = byKey.getOrPut(key) { mutableListOf() }

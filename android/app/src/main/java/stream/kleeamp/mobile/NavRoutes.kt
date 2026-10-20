@@ -32,8 +32,21 @@ import kotlinx.serialization.Serializable
 @Serializable data class LibraryProviderSongs(val accountId: String = "")
 @Serializable data class LibrarySmartPlaylist(val kind: String)
 @Serializable data class LibraryPlaylist(val slug: String)
-/** One artist's tracks, scoped strictly to that list: a playlist slug or "local-songs". */
-@Serializable data class LibraryArtist(val name: String, val context: String)
-/** One album's tracks, keyed by album + album artist so compilations stay one. */
-@Serializable data class LibraryAlbum(val name: String, val albumArtist: String, val context: String)
+/**
+ * One artist's tracks, scoped strictly to that list: a playlist slug or
+ * "local-songs". [coverUrl] is the row's first song, so the page header wears
+ * the same image the artist row did.
+ */
+@Serializable data class LibraryArtist(val name: String, val context: String, val coverUrl: String = "")
+/**
+ * One album's tracks, keyed by album + album artist so compilations stay one.
+ * [artist] is set when opened from an artist page, narrowing the album to that
+ * artist's tracks instead of every library song with the same album tag.
+ */
+@Serializable data class LibraryAlbum(
+    val name: String,
+    val albumArtist: String,
+    val context: String,
+    val artist: String = "",
+)
 @Serializable data class LibrarySongInfo(val stationUrl: String)

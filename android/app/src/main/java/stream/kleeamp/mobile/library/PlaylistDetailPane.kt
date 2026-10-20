@@ -182,7 +182,7 @@ fun LibraryPlaylistPane(
     onAddToPlaylist: (Station) -> Unit = {},
     onAddToQueue: (Station) -> Unit = {},
     onInfo: ((Station) -> Unit)? = null,
-    onOpenArtist: (String) -> Unit = {},
+    onOpenArtist: (String, String) -> Unit = { _, _ -> },
     /** Opens the add-songs sheet over this page; the sheet writes per tap. */
     onOpenAddSongs: () -> Unit = {},
     shuffled: Boolean = false,
@@ -344,7 +344,7 @@ private fun PlaylistDetailShown(
     onSortChange: (PlaylistSort) -> Unit,
     browse: Boolean = false,
     onBrowseChange: (Boolean) -> Unit = {},
-    onOpenArtist: (String) -> Unit = {},
+    onOpenArtist: (String, String) -> Unit = { _, _ -> },
     current: Station?,
     playing: Boolean,
     onPlay: (Station, List<Station>) -> Unit,
@@ -468,11 +468,11 @@ private fun PlaylistDetailShown(
             if (shownBrowse && ordered.isNotEmpty()) {
                 items(artists, key = { it.key }) { group ->
                     ListRow(
-                        onClick = { onOpenArtist(group.name) },
+                        onClick = { onOpenArtist(group.name, group.coverSong?.url.orEmpty()) },
                         verticalPadding = 9.dp,
                         leading = {
                             GroupArt(
-                                songs = group.songs,
+                                songs = listOfNotNull(group.coverSong),
                                 modifier = Modifier.size(40.dp),
                                 fallbackKey = group.key,
                                 fallbackName = group.name,

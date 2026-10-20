@@ -100,15 +100,72 @@ class LocalGroupingTest {
         assertEquals(listOf("apple", "zebra"), artistsOf(songs).map { it.name })
     }
 
-    @Test fun artistSongLivesUnderTrackArtistOnly() {
-        val songs = listOf(
-            song("t1", artist = "Daft Punk", album = "Alive 2007", albumArtist = "Daft Punk"),
-            song("t2", artist = "Gabrielle", album = "Alive 2007", albumArtist = "Daft Punk"),
+    @Test fun browseArtistNamePrefersAlbumArtist() {
+        val tagged = song("t1", artist = "Alan Walker, Ava Max", albumArtist = "Alan Walker")
+        assertEquals("Alan Walker", tagged.browseArtistName())
+        assertEquals("Ava Max", song("t2", artist = "Ava Max", albumArtist = " ").browseArtistName())
+        assertEquals("unknown artist", song("t3", artist = "", albumArtist = "").browseArtistName())
+    }
+
+    @Test fun browseArtistNameSplitsFeaturedCreditsWithoutAlbumArtist() {
+        assertEquals(
+            "Alan Walker",
+            song("t1", artist = "Alan Walker, Ava Max").browseArtistName(),
         )
-        val groups = artistsOf(songs).associateBy({ it.name }, { it.songs.map { s -> s.name } })
-        assertEquals(listOf("t1"), groups["Daft Punk"])
-        assertEquals(listOf("t2"), groups["Gabrielle"])
-        assertEquals(2, groups.values.sumOf { it.size })
+        assertEquals(
+            "Alan Walker",
+            song("t2", artist = "Alan Walker , K-391 , Emelie Hollow").browseArtistName(),
+        )
+        assertEquals(
+            "Amir Tataloo",
+            song("t3", artist = "Amir Tataloo Ft Reza Pishro & Ho3ein").browseArtistName(),
+        )
+    }
+
+    @Test fun browseArtistNameKeepsBandNamesWhole() {
+        assertEquals("Earth, Wind & Fire", song("t1", artist = "Earth, Wind & Fire").browseArtistName())
+        assertEquals("Simon & Garfunkel", song("t2", artist = "Simon & Garfunkel").browseArtistName())
+    }
+
+    @Test fun artistsCollapseFeaturedCreditsWithoutAlbumArtist() {
+        val songs = listOf(
+            song("t1", artist = "Alan Walker"),
+            song("t2", artist = "Alan Walker , Ava Max"),
+            song("t3", artist = "Alan Walker , K-391 , Emelie Hollow"),
+        )
+        val groups = artistsOf(songs)
+        assertEquals(listOf("Alan Walker"), groups.map { it.name })
+        assertEquals(3, groups.single().songs.size)
+    }
+
+    @Test fun artistsGroupByAlbumArtistNotContributingArtists() {
+        val songs = listOf(
+            song("t1", artist = "Alan Walker", album = "Different World", albumArtist = "Alan Walker"),
+            song("t2", artist = "Alan Walker, Ava Max", album = "Different World", albumArtist = "Alan Walker"),
+            song("t3", artist = "Alan Walker, K-391, Emelie Hollow", album = "Different World", albumArtist = "Alan Walker"),
+        )
+        val groups = artistsOf(songs)
+        assertEquals(listOf("Alan Walker"), groups.map { it.name })
+        assertEquals(listOf("t1", "t2", "t3"), groups.single().songs.map { it.name })
+    }
+
+    @Test fun artistsFallBackToTrackArtistWhenAlbumArtistBlank() {
+        val songs = listOf(
+            song("t1", artist = "Alan Walker", albumArtist = ""),
+            song("t2", artist = "Ava Max", albumArtist = "   "),
+        )
+        assertEquals(listOf("Alan Walker", "Ava Max"), artistsOf(songs).map { it.name })
+    }
+
+    @Test fun artistsMergeAlbumArtistCaseVariants() {
+        val songs = listOf(
+            song("t1", artist = "x", albumArtist = "alan walker"),
+            song("t2", artist = "y", albumArtist = "Alan Walker"),
+        )
+        val groups = artistsOf(songs)
+        assertEquals(1, groups.size)
+        assertEquals("alan walker", groups.single().name)
+        assertEquals(2, groups.single().songs.size)
     }
 
     @Test fun albumArtistOnlyGetsOwnRow() {
@@ -117,6 +174,41 @@ class LocalGroupingTest {
         )
         val groups = artistsOf(songs)
         assertEquals(listOf("DJ Mix"), groups.map { it.name })
+    }
+
+    @Test fun artistCoverIsFirstTrackInAlbumOrder() {
+        val songs = listOf(
+            song("later-title", album = "B", track = 1),
+            song("second-track", album = "A", track = 2),
+            song("first-track", album = "A", track = 1),
+        )
+        val group = artistsOf(songs).single()
+        assertEquals("first-track", group.coverSong?.name)
+        assertEquals(
+            "first-track",
+            artistHeaderSongs(group.songs, group.coverSong?.url.orEmpty()).first().name,
+        )
+    }
+
+    @Test fun artistHeaderLeadsWithRowCoverSong() {
+        val songs = listOf(song("a"), song("b"), song("c"))
+        val header = artistHeaderSongs(songs, songs[1].url)
+        assertEquals(listOf("b", "a", "c"), header.map { it.name })
+    }
+
+    @Test fun artistHeaderKeepsOrderWithoutCoverSong() {
+        val songs = listOf(song("a"), song("b"))
+        assertEquals(listOf("a", "b"), artistHeaderSongs(songs, "").map { it.name })
+        assertEquals(listOf("a", "b"), artistHeaderSongs(songs, "local:missing").map { it.name })
+    }
+
+    @Test fun albumMatchScopesToArtistWhenGiven() {
+        val alan = song("t1", artist = "Alan Walker", album = "Music", albumArtist = "")
+        val sia = song("t2", artist = "Sia", album = "Music", albumArtist = "")
+        assertTrue(alan.matchesAlbum("Music", "", "Alan Walker"))
+        assertFalse(sia.matchesAlbum("Music", "", "Alan Walker"))
+        assertTrue(alan.matchesAlbum("Music", ""))
+        assertTrue(sia.matchesAlbum("Music", ""))
     }
 
     @Test fun artistsMergeCaseVariants() {

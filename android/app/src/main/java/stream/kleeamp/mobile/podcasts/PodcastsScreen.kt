@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -34,7 +33,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,10 +67,6 @@ import stream.kleeamp.mobile.theme.KleeampType
 import stream.kleeamp.mobile.theme.LocalPalette
 import stream.kleeamp.mobile.theme.Mono
 
-private enum class Pane(val label: String) {
-    All("all"), Subs("subscribed"), Directory("directory")
-}
-
 /**
  * Podcasts, laid out as the Stations tab is: the lists you own on top, the
  * directory below, one flat scroll, paged as it runs out.
@@ -91,7 +85,6 @@ fun PodcastsScreen(
 ) {
     val p = LocalPalette.current
     val scope = rememberCoroutineScope()
-    var pane by rememberSaveable { mutableStateOf(Pane.All) }
     val ui by vm.state.collectAsState()
     val playedShows by vm.playedShows.collectAsState()
     val subsGrid = ui.subsGrid
@@ -103,7 +96,7 @@ fun PodcastsScreen(
     val subscriptions = ui.subscriptions
 
     val listState = rememberLazyGridState()
-    // NOTE: no scroll reset on query/pane change, same reasoning as Stations.
+    // NOTE: no scroll reset on query change, same reasoning as Stations.
     val nearEnd by remember {
         derivedStateOf {
             val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -111,7 +104,7 @@ fun PodcastsScreen(
         }
     }
     LaunchedEffect(nearEnd, directory.shows.size) {
-        if (nearEnd && pane != Pane.Subs) vm.onEvent(PodcastsViewModel.Event.NextPage)
+        if (nearEnd) vm.onEvent(PodcastsViewModel.Event.NextPage)
     }
 
     val subscribedFeeds = remember(subscriptions) { subscriptions.mapTo(HashSet()) { it.feedUrl } }
@@ -127,7 +120,7 @@ fun PodcastsScreen(
     // Warm catalogue art on entry and on page append: small for rows, full
     // for the first tiles (which decode full-res). Full downloads share
     // their bytes on disk, so the small path then decodes without network.
-    LaunchedEffect(pane, subscriptions.size, directory.shows.size) {
+    LaunchedEffect(subscriptions.size, directory.shows.size) {
         val urls = subscriptions.map { it.artwork } + directory.shows.map { it.artwork }
         ArtResolve.prefetchSmallUrls(urls)
         ArtResolve.prefetchFullUrls(urls)
@@ -138,10 +131,6 @@ fun PodcastsScreen(
         onOpenSearch = onOpenSearch,
         onOpenSettings = onOpenSettings,
         onTitleClick = { scope.scrollToTop(listState) },
-        chips = {
-            Pane.entries.forEach { s -> Chip(s.label, pane == s, onClick = { pane = s }) }
-            Spacer(Modifier.width(4.dp))
-        },
     ) {
 
         // Same known androidx LazyGrid span-flip crash guard as Stations:
@@ -159,93 +148,22 @@ fun PodcastsScreen(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
 
-                if (pane == Pane.Subs) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        SectionLabel("subscribed — ${subscriptions.size}", gutter = 8.dp) {
-                            GridListToggle(subsGrid) { vm.onEvent(PodcastsViewModel.Event.ToggleSubsGrid) }
-                        }
-                    }
-                    if (subscriptions.isEmpty()) {
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            EmptyNote("nothing subscribed — open a show and subscribe")
-                        }
-                    } else {
-                        items(
-                            subscriptions,
-                            key = { "sub:${it.feedUrl}" },
-                            span = { GridItemSpan(if (subsGrid) 1 else maxLineSpan) },
-                        ) { show ->
-                            if (subsGrid) {
-                                ShowTile(
-                                    show = show,
-                                    onOpen = { onOpenShow(show) },
-                                    onOpenMenu = { menuShow = show },
-                                )
-                            } else {
-                                ShowRow(
-                                    show = show,
-                                    subscribed = true,
-                                    onOpen = { onOpenShow(show) },
-                                    onOpenMenu = { menuShow = show },
-                                )
-                            }
-                        }
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    SectionLabel("subscribed — ${subscriptions.size}", gutter = 8.dp) {
+                        GridListToggle(subsGrid) { vm.onEvent(PodcastsViewModel.Event.ToggleSubsGrid) }
                     }
                 }
-
-                if (pane != Pane.Subs) {
+                if (subscriptions.isEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        SectionLabel("directory", gutter = 8.dp) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                // The default top chart needs no announcement;
-                                // every other query names itself.
-                                if (directory.query !is PodcastQuery.Top) {
-                                    Mono(directory.query.label, KleeampType.meta, p.inkTertiary)
-                                }
-                                val topQuery = directory.query as? PodcastQuery.Top
-                                Chip(
-                                    topQuery?.country?.takeIf { it.isNotEmpty() }?.let { c ->
-                                        countryList.firstOrNull { it.iso31661.equals(c, ignoreCase = true) }?.name ?: c
-                                    } ?: "all countries",
-                                    selected = topQuery != null && topQuery.country.isNotEmpty(),
-                                    onClick = { countrySheet = true },
-                                    caret = true,
-                                )
-                                GridListToggle(podDirectoryGrid) {
-                                    vm.onEvent(PodcastsViewModel.Event.TogglePodDirectoryGrid)
-                                }
-                            }
-                        }
+                        EmptyNote("nothing subscribed — open a show and subscribe")
                     }
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Row(
-                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(7.dp),
-                        ) {
-                            // The genres narrow the chart; the country chart
-                            // rides the section header by the grid toggle.
-                            PodcastDirectory.genres.forEach { g ->
-                                val q = directory.query
-                                Chip(
-                                    g.name.lowercase(),
-                                    selected = q is PodcastQuery.Category && q.genre.id == g.id,
-                                    onClick = { vm.onEvent(PodcastsViewModel.Event.Load(PodcastQuery.Category(g))) },
-                                )
-                            }
-                        }
-                    }
-                    item(span = { GridItemSpan(maxLineSpan) }) { Spacer(Modifier.height(6.dp)) }
-
+                } else {
                     items(
-                        directory.shows,
-                        key = { "dir:${it.feedUrl}" },
-                        span = { GridItemSpan(if (podDirectoryGrid) 1 else maxLineSpan) },
+                        subscriptions,
+                        key = { "sub:${it.feedUrl}" },
+                        span = { GridItemSpan(if (subsGrid) 1 else maxLineSpan) },
                     ) { show ->
-                        if (podDirectoryGrid) {
+                        if (subsGrid) {
                             ShowTile(
                                 show = show,
                                 onOpen = { onOpenShow(show) },
@@ -254,23 +172,90 @@ fun PodcastsScreen(
                         } else {
                             ShowRow(
                                 show = show,
-                                subscribed = show.feedUrl in subscribedFeeds,
+                                subscribed = true,
                                 onOpen = { onOpenShow(show) },
                                 onOpenMenu = { menuShow = show },
                             )
                         }
                     }
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        when {
-                            directory.error != null -> RetryNote(
-                                message = "couldn't fetch the directory",
-                                prominent = directory.shows.isEmpty(),
-                                onRetry = { vm.onEvent(PodcastsViewModel.Event.Load(directory.query)) },
+                }
+
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    SectionLabel("directory", gutter = 8.dp) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            // The default top chart needs no announcement;
+                            // every other query names itself.
+                            if (directory.query !is PodcastQuery.Top) {
+                                Mono(directory.query.label, KleeampType.meta, p.inkTertiary)
+                            }
+                            val topQuery = directory.query as? PodcastQuery.Top
+                            Chip(
+                                topQuery?.country?.takeIf { it.isNotEmpty() }?.let { c ->
+                                    countryList.firstOrNull { it.iso31661.equals(c, ignoreCase = true) }?.name ?: c
+                                } ?: "all countries",
+                                selected = topQuery != null && topQuery.country.isNotEmpty(),
+                                onClick = { countrySheet = true },
+                                caret = true,
                             )
-                            directory.loading -> LoadingNote("loading more…")
-                            directory.exhausted -> EmptyNote("end of ${directory.query.label}")
-                            else -> Spacer(Modifier.height(8.dp))
+                            GridListToggle(podDirectoryGrid) {
+                                vm.onEvent(PodcastsViewModel.Event.TogglePodDirectoryGrid)
+                            }
                         }
+                    }
+                }
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    ) {
+                        // The genres narrow the chart; the country chart
+                        // rides the section header by the grid toggle.
+                        PodcastDirectory.genres.forEach { g ->
+                            val q = directory.query
+                            Chip(
+                                g.name.lowercase(),
+                                selected = q is PodcastQuery.Category && q.genre.id == g.id,
+                                onClick = { vm.onEvent(PodcastsViewModel.Event.Load(PodcastQuery.Category(g))) },
+                            )
+                        }
+                    }
+                }
+                item(span = { GridItemSpan(maxLineSpan) }) { Spacer(Modifier.height(6.dp)) }
+
+                items(
+                    directory.shows,
+                    key = { "dir:${it.feedUrl}" },
+                    span = { GridItemSpan(if (podDirectoryGrid) 1 else maxLineSpan) },
+                ) { show ->
+                    if (podDirectoryGrid) {
+                        ShowTile(
+                            show = show,
+                            onOpen = { onOpenShow(show) },
+                            onOpenMenu = { menuShow = show },
+                        )
+                    } else {
+                        ShowRow(
+                            show = show,
+                            subscribed = show.feedUrl in subscribedFeeds,
+                            onOpen = { onOpenShow(show) },
+                            onOpenMenu = { menuShow = show },
+                        )
+                    }
+                }
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    when {
+                        directory.error != null -> RetryNote(
+                            message = "couldn't fetch the directory",
+                            prominent = directory.shows.isEmpty(),
+                            onRetry = { vm.onEvent(PodcastsViewModel.Event.Load(directory.query)) },
+                        )
+                        directory.loading -> LoadingNote("loading more…")
+                        directory.exhausted -> EmptyNote("end of ${directory.query.label}")
+                        else -> Spacer(Modifier.height(8.dp))
                     }
                 }
 

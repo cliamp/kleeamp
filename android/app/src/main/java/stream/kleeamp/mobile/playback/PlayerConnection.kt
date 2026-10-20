@@ -631,7 +631,6 @@ class PlayerConnection(
     private fun primeSeek(station: Station, fraction: Float) {
         pendingSeekFraction = fraction
         pendingSeekStationId = station.id
-        PlaybackBus.lastSeekMs = System.currentTimeMillis()
         val c = controller
         if (c == null || c.mediaItemCount == 0) {
             play(station)

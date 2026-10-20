@@ -63,13 +63,6 @@ object PlaybackBus {
     val reconnectAttempt: StateFlow<Int> = _reconnectAttempt.asStateFlow()
 
     /**
-     * Last user/auto seek, millis. Artwork and ICY metadata swaps rebuild the
-     * playing item (which resets its position), so they stand down for a
-     * moment after a seek instead of dragging a stale position back over it.
-     */
-    @Volatile var lastSeekMs: Long = 0L
-
-    /**
      * When the audible station last changed, millis. The optimistic 3s grace
      * anchors here — not on composition — so opening the player sheet does
      * not restart the window and hide a stall that began minutes ago.

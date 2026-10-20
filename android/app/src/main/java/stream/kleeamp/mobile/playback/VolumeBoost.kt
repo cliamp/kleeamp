@@ -16,6 +16,9 @@ class VolumeBoost {
     private var sessionId = 0
     private var boostDb = 0
 
+    /** Session whose effect creation already failed; see [AudioFx]. */
+    private var failedSessionId = 0
+
     /** True when the device ships a loudness-enhancer effect at all. */
     fun isSupported(): Boolean = runCatching {
         AudioEffect.queryEffects()?.any { it.type == AudioEffect.EFFECT_TYPE_LOUDNESS_ENHANCER }
@@ -28,6 +31,7 @@ class VolumeBoost {
     fun attach(audioSessionId: Int) {
         if (audioSessionId == 0) return
         if (audioSessionId == sessionId && enhancer != null) return
+        if (audioSessionId == failedSessionId) return
         release()
         sessionId = audioSessionId
         runCatching {
@@ -35,8 +39,10 @@ class VolumeBoost {
                 enabled = true
                 setTargetGain(boostDb * 100)
             }
+            failedSessionId = 0
         }.onFailure {
             Log.w(TAG, "loudness enhancer unavailable: ${it.message}")
+            failedSessionId = audioSessionId
             enhancer = null
         }
     }
@@ -51,6 +57,7 @@ class VolumeBoost {
         runCatching { enhancer?.release() }
         enhancer = null
         sessionId = 0
+        failedSessionId = 0
     }
 
     private companion object {

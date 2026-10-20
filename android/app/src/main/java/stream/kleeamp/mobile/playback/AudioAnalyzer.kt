@@ -101,14 +101,18 @@ class AudioAnalyzer(
     }
 
     /**
-     * Clear smoothing + ring state for a new source (station/track change).
-     * Called on media-item transition so stale peaks never carry over.
-     * ICY/stream-title changes do NOT call this — animation continues.
+     * Clear smoothing state for a new source (station/track change). Called
+     * on media-item transition so stale peaks never carry over. ICY/stream-
+     * title changes do NOT call this — animation continues.
+     *
+     * The PCM ring is deliberately not cleared here: it is written by the
+     * audio thread, and rewinding its cursor from the main thread can erase
+     * the first samples of the new track. Resetting the read cursors below
+     * makes the analyzer re-anchor on the newest audio instead.
      */
     fun reset() {
         prev.fill(0f)
         out.fill(0f)
-        PcmRing.clear()
         lastWritten = -1L
         waveEnd = -1L
         lastWaveNs = System.nanoTime()

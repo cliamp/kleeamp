@@ -98,12 +98,15 @@ class PlaybackService : MediaSessionService() {
      * Mono downmix through Media3's own channel mixer - no hand-rolled buffer
      * math. Stereo folds to dual mono (the average in both ears) so channel
      * counts never change and the AudioTrack never reconfigures; anything
-     * else wears an identity matrix, which the mixer treats as inactive
-     * passthrough. Matrices are pure state on the mixer, so the key flips
-     * live with no rebuild and no gap.
+     * else wears a next-after-unity diagonal that behaves as passthrough. It
+     * is not an exact identity on purpose: Media3 treats identity as
+     * "processor inactive" and does not re-run onConfigure when only a matrix
+     * changes, so an exact identity would make the mono key a no-op until the
+     * next track. The one-ULP scale keeps the mixer live, so the key flips
+     * mid-track with no rebuild and no gap.
      */
     private val mixer = ChannelMixingAudioProcessor().also { m ->
-        for (n in 1..8) m.putChannelMixingMatrix(identityMatrix(n))
+        for (n in 1..8) m.putChannelMixingMatrix(passthroughMatrix(n))
     }
 
     private val stereoTap = StereoMeterTap()
@@ -127,12 +130,12 @@ class PlaybackService : MediaSessionService() {
     /** The settings key, mirrored here because the format listener is sync. */
     @Volatile private var monoOn = false
 
-    /** Stereo averages to dual mono while on; everything else is identity. */
+    /** Stereo averages to dual mono while on; everything else is passthrough. */
     private fun applyMonoMatrix() {
         val n = mixerChannels.coerceIn(1, 8)
         mixer.putChannelMixingMatrix(
             if (monoOn && n == 2) ChannelMixingMatrix(2, 2, floatArrayOf(0.5f, 0.5f, 0.5f, 0.5f))
-            else identityMatrix(n)
+            else passthroughMatrix(n)
         )
     }
 
@@ -453,24 +456,16 @@ class PlaybackService : MediaSessionService() {
                 if (attempt < 2) kotlinx.coroutines.delay(2_000)
             }
             val cover = art ?: return@launch
-            standDownForSeek()
             swapArtwork(station, cover)
         }
     }
 
-    /** Waits out a seek in flight so the swap below reads a settled clock. */
-    private suspend fun standDownForSeek() {
-        val sinceSeek = System.currentTimeMillis() - PlaybackBus.lastSeekMs
-        if (sinceSeek in 0 until SEEK_STAND_DOWN_MS) {
-            kotlinx.coroutines.delay(SEEK_STAND_DOWN_MS - sinceSeek)
-        }
-    }
-
     /**
-     * Stamps fetched art onto its item. replaceMediaItem resets the item to
-     * its default position, so a local file, podcast or channel track would
-     * jump back to 0:00 when its art lands; live radio sits on the live edge
-     * either way, so only finite tracks hold their position.
+     * Stamps fetched art onto its item. replaceMediaItem keeps the item's
+     * current position, so this must not seek afterwards: a seek right after
+     * an item transition pushes the audio renderer back through BUFFERING and
+     * leaves the first moments of the new track silent, which is especially
+     * audible over Bluetooth and wired headphones.
      */
     private fun swapArtwork(station: Station, cover: android.graphics.Bitmap) {
         // The bus may still name the previous track this early, so the
@@ -482,15 +477,8 @@ class PlaybackService : MediaSessionService() {
         val fresh = player.currentMediaItem
             ?.takeIf { it.mediaId == station.id } ?: return
         if (fresh.mediaMetadata.artworkData?.contentEquals(bytes) == true) return
-        // replaceMediaItem resets the item to its default position, so a
-        // local file, podcast or channel track would jump back to 0:00 a
-        // few seconds after tune (or after a seek) when its art lands.
-        // Live radio sits on the live edge either way. Hold the position
-        // for finite tracks.
-        val index = player.currentMediaItemIndex
-        val pos = player.currentPosition.coerceAtLeast(0)
         player.replaceMediaItem(
-            index,
+            player.currentMediaItemIndex,
             fresh.buildUpon()
                 .setMediaMetadata(
                     fresh.mediaMetadata.buildUpon()
@@ -499,7 +487,6 @@ class PlaybackService : MediaSessionService() {
                 )
                 .build(),
         )
-        if (station.isTrack && pos > 0) runCatching { player.seekTo(index, pos) }
     }
 
     /**
@@ -660,7 +647,9 @@ class PlaybackService : MediaSessionService() {
      * Self-healing EQ attach: the audio session id only becomes valid once the
      * renderer is up, so a session that was not ready fails attach once. The
      * PCM tap needs no healing (it is in the sink chain from the start), but
-     * the EQ does — rechecked twice a second while playback is wanted.
+     * the EQ does — rechecked twice a second while playback is wanted. A
+     * session whose effect creation failed is remembered, so unsupported
+     * devices are not re-probed every tick.
      */
     private fun reattachAnalyserIfStalled() {
         val now = System.currentTimeMillis()
@@ -747,10 +736,9 @@ class PlaybackService : MediaSessionService() {
             val current = item.mediaMetadata
             if (current.artist?.toString() == songTitle) return
             icyRefreshId = item.mediaId
-            // Same reset as the artwork swap: hold a finite track's clock
-            // across the rebuild so an ICY refresh never restarts an episode.
+            // replaceMediaItem also preserves the current position, so an ICY
+            // refresh never restarts an episode or a finite track.
             val index = player.currentMediaItemIndex
-            val pos = player.currentPosition.coerceAtLeast(0)
             player.replaceMediaItem(
                 index,
                 item.buildUpon()
@@ -762,7 +750,6 @@ class PlaybackService : MediaSessionService() {
                     )
                     .build(),
             )
-            if (station.isTrack && pos > 0) runCatching { player.seekTo(index, pos) }
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -898,12 +885,6 @@ class PlaybackService : MediaSessionService() {
 
         /** Minimum gap between analyser re-attach attempts; see the ticker. */
         const val FX_RETRY_MS = 2000L
-        /**
-         * How long artwork/metadata swaps stand down after a seek. The swap
-         * rebuilds the item (resetting its position), so firing on a stale
-         * pre-seek read drags a fresh seek back to zero.
-         */
-        const val SEEK_STAND_DOWN_MS = 5_000L
         const val CMD_PREV_STATION = "stream.kleeamp.mobile.PREV_STATION"
         const val CMD_NEXT_STATION = "stream.kleeamp.mobile.NEXT_STATION"
         const val CMD_SHUFFLE = "stream.kleeamp.mobile.SHUFFLE"
@@ -991,10 +972,16 @@ private class OxideNotificationProvider(context: Context) :
     }
 }
 
-/** An N-to-N diagonal of ones: the mixer's spelling of passthrough. */
+/**
+ * An N-to-N diagonal a single float ULP above unity. It is inaudible
+ * (+0.0000009 dB) but not [ChannelMixingMatrix.isIdentity], which keeps
+ * Media3's mixer active so [PlaybackService.applyMonoMatrix] can change the
+ * live mono matrix without rebuilding the sink. Using next-after-unity (not
+ * next-below) also avoids truncating PCM16 samples by one LSB.
+ */
 @UnstableApi
-private fun identityMatrix(n: Int): ChannelMixingMatrix =
-    ChannelMixingMatrix(n, n, FloatArray(n * n) { i -> if (i % (n + 1) == 0) 1f else 0f })
+private fun passthroughMatrix(n: Int): ChannelMixingMatrix =
+    ChannelMixingMatrix(n, n, FloatArray(n * n) { i -> if (i % (n + 1) == 0) 1.0000001f else 0f })
 
 /**
  * Gain for the audible station: its section's remembered boost when

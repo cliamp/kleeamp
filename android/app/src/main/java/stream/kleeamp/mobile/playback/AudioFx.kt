@@ -20,7 +20,14 @@ class AudioFx(private val bands: Int = 64) {
 
     private var equalizer: Equalizer? = null
     private var sessionId = 0
-    private var spectrumOn = false
+
+    /**
+     * Session whose effect creation already failed. Re-attempting every couple
+     * of seconds on a device without an equalizer only burns main-thread time
+     * and logs; a new audio session is the only thing that can change the
+     * answer. Reset by [release] so a service restart tries once more.
+     */
+    private var failedSessionId = 0
 
     val bandLabels: List<String> get() = _bandLabels
     private var _bandLabels: List<String> = emptyList()
@@ -34,18 +41,16 @@ class AudioFx(private val bands: Int = 64) {
 
     fun attach(
         audioSessionId: Int,
-        spectrumEnabled: Boolean,
+        @Suppress("UNUSED_PARAMETER") spectrumEnabled: Boolean,
         onSpectrum: (FloatArray) -> Unit = {},
         onWaveform: (FloatArray) -> Unit = {},
         onLiveChanged: (Boolean) -> Unit = {},
     ) {
         if (audioSessionId == 0) return
-        if (audioSessionId == sessionId && spectrumEnabled == spectrumOn && equalizer != null) {
-            return
-        }
+        if (audioSessionId == sessionId && equalizer != null) return
+        if (audioSessionId == failedSessionId) return
         release()
         sessionId = audioSessionId
-        spectrumOn = spectrumEnabled
 
         runCatching {
             equalizer = Equalizer(0, audioSessionId).apply {
@@ -58,7 +63,12 @@ class AudioFx(private val bands: Int = 64) {
                     if (hz >= 1000) "${hz / 1000}k" else "$hz"
                 }
             }
-        }.onFailure { Log.w(TAG, "equalizer unavailable: ${it.message}") }
+            failedSessionId = 0
+        }.onFailure {
+            failedSessionId = audioSessionId
+            equalizer = null
+            Log.w(TAG, "equalizer unavailable: ${it.message}")
+        }
     }
 
     /**
@@ -98,7 +108,7 @@ class AudioFx(private val bands: Int = 64) {
         runCatching { equalizer?.release() }
         equalizer = null
         sessionId = 0
-        spectrumOn = false
+        failedSessionId = 0
         spectrumLive = false
     }
 

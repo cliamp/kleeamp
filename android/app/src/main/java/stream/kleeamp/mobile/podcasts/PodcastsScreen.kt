@@ -84,7 +84,6 @@ fun PodcastsScreen(
     onOpenSearch: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
 ) {
-    val p = LocalPalette.current
     val scope = rememberCoroutineScope()
     val ui by vm.state.collectAsState()
     val playedShows by vm.playedShows.collectAsState()
@@ -188,11 +187,6 @@ fun PodcastsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            // The default top chart needs no announcement;
-                            // every other query names itself.
-                            if (directory.query !is PodcastQuery.Top) {
-                                Mono(directory.query.label, KleeampType.meta, p.inkTertiary)
-                            }
                             val topQuery = directory.query as? PodcastQuery.Top
                             Chip(
                                 topQuery?.country?.takeIf { it.isNotEmpty() }?.let { c ->
@@ -214,10 +208,19 @@ fun PodcastsScreen(
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(7.dp),
                     ) {
-                        // The genres narrow the chart; the country chart
-                        // rides the section header by the grid toggle.
+                        // Top leads the row, exactly as it does on Stations;
+                        // the genre chips narrow the chart from there.
+                        val q = directory.query
+                        Chip(
+                            "top",
+                            q is PodcastQuery.Top && q.country.isBlank(),
+                            onClick = {
+                                if (q != PodcastQuery.Top()) {
+                                    vm.onEvent(PodcastsViewModel.Event.Load(PodcastQuery.Top()))
+                                }
+                            },
+                        )
                         PodcastDirectory.genres.forEach { g ->
-                            val q = directory.query
                             Chip(
                                 g.name.lowercase(),
                                 selected = q is PodcastQuery.Category && q.genre.id == g.id,

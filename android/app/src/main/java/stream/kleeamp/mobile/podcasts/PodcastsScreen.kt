@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -166,6 +167,7 @@ fun PodcastsScreen(
                         if (subsGrid) {
                             ShowTile(
                                 show = show,
+                                subscribed = true,
                                 onOpen = { onOpenShow(show) },
                                 onOpenMenu = { menuShow = show },
                             )
@@ -234,6 +236,7 @@ fun PodcastsScreen(
                     if (podDirectoryGrid) {
                         ShowTile(
                             show = show,
+                            subscribed = show.feedUrl in subscribedFeeds,
                             onOpen = { onOpenShow(show) },
                             onOpenMenu = { menuShow = show },
                         )
@@ -323,16 +326,8 @@ private fun ShowRow(
         onClick = onOpen,
         verticalPadding = 9.dp,
         gutter = 8.dp,
-        leading = { Artwork(show) },
-        trailing = {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (subscribed) {
-                    Mono("SUB", KleeampType.tabLabel, p.accent)
-                }
-                OverflowButton(onOpenMenu, size = 16)
-                Icon(KleeampIcons.CaretRight, null, Modifier.size(9.dp), tint = p.inkFaint)
-            }
-        },
+        leading = { Artwork(show, subscribed) },
+        trailing = { OverflowButton(onOpenMenu, size = 16) },
     ) {
         Mono(show.title, KleeampType.rowPrimary, p.ink, maxLines = 1)
         Mono(show.meta, KleeampType.rowSecondary, p.inkTertiary, maxLines = 1)
@@ -345,7 +340,7 @@ private fun ShowRow(
  * row thumbnail does; the grid tile decodes full-res separately.
  */
 @Composable
-private fun Artwork(show: PodcastShow) {
+private fun Artwork(show: PodcastShow, subscribed: Boolean) {
     val p = LocalPalette.current
     val art = rememberArt(url = show.artwork)
     Box(
@@ -370,6 +365,32 @@ private fun Artwork(show: PodcastShow) {
                 radius = KleeampShape.small,
             )
         }
+        if (subscribed) {
+            SubscriptionBadge(
+                boxDp = 14,
+                glyphDp = 9,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(2.dp),
+            )
+        }
+    }
+}
+
+/** Accent tick over artwork: subscribed, without adding a trailing word to the row. */
+@Composable
+private fun SubscriptionBadge(
+    modifier: Modifier = Modifier,
+    boxDp: Int = 15,
+    glyphDp: Int = 9,
+) {
+    val p = LocalPalette.current
+    Box(
+        modifier
+            .size(boxDp.dp)
+            .clip(CircleShape)
+            .background(p.accent),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(KleeampIcons.Check, "subscribed", Modifier.size(glyphDp.dp), tint = p.onAccent)
     }
 }
 
@@ -378,6 +399,7 @@ private fun Artwork(show: PodcastShow) {
 @Composable
 private fun ShowTile(
     show: PodcastShow,
+    subscribed: Boolean,
     onOpen: () -> Unit,
     onOpenMenu: () -> Unit,
 ) {
@@ -407,6 +429,13 @@ private fun ShowTile(
                     name = show.title,
                     modifier = Modifier.fillMaxSize(),
                     radius = KleeampShape.medium,
+                )
+            }
+            if (subscribed) {
+                SubscriptionBadge(
+                    boxDp = 18,
+                    glyphDp = 10,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
                 )
             }
             Box(Modifier.align(Alignment.TopEnd).padding(10.dp)) {

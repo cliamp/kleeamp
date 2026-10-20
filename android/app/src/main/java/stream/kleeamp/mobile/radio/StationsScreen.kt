@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -73,10 +72,6 @@ import stream.kleeamp.mobile.theme.KleeampType
 import stream.kleeamp.mobile.theme.LocalPalette
 import stream.kleeamp.mobile.theme.Mono
 
-private enum class Source(val label: String) {
-    All("all"), Cliamp("cliamp"), Directory("directory"), Custom("custom")
-}
-
 @Composable
 fun StationsScreen(
     vm: StationsViewModel,
@@ -97,7 +92,6 @@ fun StationsScreen(
 ) {
     val p = LocalPalette.current
     val scope = rememberCoroutineScope()
-    var source by rememberSaveable { mutableStateOf(Source.All) }
     // Local favorites filter for the directory: the list is already in
     // memory, so no query, no paging, no network. Any real query (trending,
     // tag, country) switches it back off.
@@ -180,13 +174,8 @@ fun StationsScreen(
     // visible rows; this warms small art only, never full.
     val resolver = LocalContext.current.contentResolver
     val listState = rememberLazyListState()
-    val displayStations: List<Station> = remember(source, cliamp, custom, directory.stations) {
-        when (source) {
-            Source.All -> cliamp + custom + directory.stations
-            Source.Cliamp -> cliamp
-            Source.Custom -> custom
-            Source.Directory -> directory.stations
-        }
+    val displayStations: List<Station> = remember(cliamp, custom, directory.stations) {
+        cliamp + custom + directory.stations
     }
     val visibleRange by remember {
         derivedStateOf {
@@ -196,7 +185,7 @@ fun StationsScreen(
             first..last
         }
     }
-    LaunchedEffect(visibleRange, source, displayStations.size) {
+    LaunchedEffect(visibleRange, displayStations.size) {
         // Lazy indices include section headers, so shift back slightly and
         // clamp; the +8 overscan absorbs the offset either way.
         val start = (visibleRange.first - 2).coerceAtLeast(0)
@@ -216,7 +205,7 @@ fun StationsScreen(
     var menuFor by remember { mutableStateOf<Station?>(null) }
     // The country picker: a bottom sheet, not the old dropdown menu.
     var countrySheet by remember { mutableStateOf(false) }
-    // NOTE: no scroll reset on query/source change. A filter keeps its
+    // NOTE: no scroll reset on query change. A filter keeps its
     // scroll position while the repository swaps content underneath
     // (stale rows stay until the live page lands), and returning from
     // search or the player keeps the position you left.
@@ -228,7 +217,7 @@ fun StationsScreen(
     }
     LaunchedEffect(nearEnd, directory.stations.size, favOnly) {
         // The favorites filter is local: no pages to fetch behind it.
-        if (nearEnd && !favOnly && source != Source.Cliamp && source != Source.Custom) {
+        if (nearEnd && !favOnly) {
             vm.onEvent(StationsViewModel.Event.NextPage)
         }
     }
@@ -250,10 +239,9 @@ fun StationsScreen(
     // so the request is consumed and a later plain tab switch does not re-jump.
     LaunchedEffect(focusDirectory) {
         if (!focusDirectory) return@LaunchedEffect
-        val directoryShown = source == Source.All || source == Source.Directory
-        if (!directoryShown) return@LaunchedEffect
-        var idx = 0
-        if (source == Source.All || source == Source.Cliamp) idx += 1 + cliamp.size
+        var idx = if (ui.listenerGlobe) 1 else 0
+        idx += 1 + if (cliampError != null) 1 else cliamp.size
+        idx += 1 + custom.size
         listState.animateScrollToItem(idx)
         onDirectoryFocusConsumed()
     }
@@ -266,12 +254,6 @@ fun StationsScreen(
         // estimator undershoots past the tall globe card and then snaps,
         // which reads as scroll-then-jump.
         onTitleClick = { scope.launch { listState.animateScrollToItem(0) } },
-        chips = {
-            Source.entries.forEach { s ->
-                Chip(s.label, source == s, onClick = { source = s })
-            }
-            Spacer(Modifier.width(4.dp))
-        },
     ) {
 
         LazyColumn(
@@ -284,10 +266,9 @@ fun StationsScreen(
         ) {
 
             // Page hero: the live listener globe sits above the cliamp
-            // section on All and Cliamp only — it renders cliamp stats, so
-            // Directory and Custom hide it. The setting toggles the whole
-            // section - globe and top countries together.
-            if (ui.listenerGlobe && (source == Source.All || source == Source.Cliamp)) {
+            // section. The setting toggles the whole section - globe and top
+            // countries together.
+            if (ui.listenerGlobe) {
                 item {
                     ListenerAnalytics(
                         stats = viewStats,
@@ -302,214 +283,208 @@ fun StationsScreen(
                 }
             }
 
-            if (source == Source.All || source == Source.Cliamp) {
-                item {
-                    SectionLabel("cliamp radio — ${cliamp.size}", gutter = 8.dp) {
-                        CliampStatsText(vm, extra = if (liveSlug != null) 1 else 0)
-                    }
-                }
-                if (cliampError != null) {
-                    item {
-                        RetryNote(
-                            message = "couldn't reach cliamp radio",
-                            onRetry = { vm.onEvent(StationsViewModel.Event.RefreshCliamp) },
-                        )
-                    }
-                } else {
-                    items(
-                        cliamp,
-                        key = { "cl:${it.url}" },
-                    ) { s ->
-                        val channel = channelBySlug[s.slug]
-                        // A channel stays lit while any of its tracks plays,
-                        // so the row always shows where the music belongs.
-                        val rowActive = current?.url == s.url ||
-                            (current?.isChannelTrack == true && current.slug == s.slug)
-                        StationRow(
-                            station = s,
-                            trackCount = if (channel?.hasTracks == true) channel.trackCount else 0,
-                            listenerCount = boostedCount(s.slug),
-                            active = rowActive,
-                            playing = playing && rowActive,
-                            onPlay = {
-                                if (channel?.hasTracks == true) onOpenChannel(s)
-                                else onPlay(s, cliamp, null)
-                            },
-                            onOpenMenu = { menuFor = s },
-                        )
-                    }
+            item {
+                SectionLabel("cliamp radio — ${cliamp.size}", gutter = 8.dp) {
+                    CliampStatsText(vm, extra = if (liveSlug != null) 1 else 0)
                 }
             }
-
-            if (source == Source.All || source == Source.Custom) {
+            if (cliampError != null) {
                 item {
-                    SectionLabel("custom — ${custom.size}", gutter = 8.dp) {
-                        Box(
-                            Modifier
-                                .size(34.dp)
-                                // Nudge to the row end: the shared label
-                                // gutter leaves the key sitting in from
-                                // the edge next to the rows below.
-                                .offset(x = 7.dp)
-                                .clip(RoundedCornerShape(KleeampShape.small))
-                                .background(if (p.dark) p.keyFace else p.ground)
-                                .border(1.dp, p.keyBorder, RoundedCornerShape(KleeampShape.small))
-                                .microPress(onClick = onAddCustom),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(KleeampIcons.Plus, "add station", Modifier.size(16.dp), tint = p.accent)
-                        }
-                    }
+                    RetryNote(
+                        message = "couldn't reach cliamp radio",
+                        onRetry = { vm.onEvent(StationsViewModel.Event.RefreshCliamp) },
+                    )
                 }
+            } else {
                 items(
-                    custom,
-                    key = { "cu:${it.url}" },
+                    cliamp,
+                    key = { "cl:${it.url}" },
                 ) { s ->
-                    CustomStationRow(
+                    val channel = channelBySlug[s.slug]
+                    // A channel stays lit while any of its tracks plays,
+                    // so the row always shows where the music belongs.
+                    val rowActive = current?.url == s.url ||
+                        (current?.isChannelTrack == true && current.slug == s.slug)
+                    StationRow(
                         station = s,
-                        active = current?.url == s.url,
-                        playing = playing && current?.url == s.url,
-                        onPlay = { onPlay(s, custom, null) },
+                        trackCount = if (channel?.hasTracks == true) channel.trackCount else 0,
+                        listenerCount = boostedCount(s.slug),
+                        active = rowActive,
+                        playing = playing && rowActive,
+                        onPlay = {
+                            if (channel?.hasTracks == true) onOpenChannel(s)
+                            else onPlay(s, cliamp, null)
+                        },
                         onOpenMenu = { menuFor = s },
                     )
                 }
             }
 
-            if (source == Source.All || source == Source.Directory) {
-                val dirStations = if (favOnly) favStations else directory.stations
-                // Directory rows keep catalogue paging alive in the player:
-                // next at the end of the loaded page asks this continuation for
-                // the following page, so playback never stops at one page.
-                val dirMore: QueueContinuation? =
-                    if (favOnly) null else vm.continuation(directory.query, dirStations.size)
-                item {
-                    SectionLabel(
-                        if (favOnly) {
-                            "favorites — ${dirStations.size}"
-                        } else {
-                            "directory — " + (dirStats?.playable?.let { "%,d".format(it) }
-                                ?: if (directory.error != null) "unreachable" else "loading")
-                        },
-                        gutter = 8.dp,
+            item {
+                SectionLabel("custom — ${custom.size}", gutter = 8.dp) {
+                    Box(
+                        Modifier
+                            .size(34.dp)
+                            // Nudge to the row end: the shared label
+                            // gutter leaves the key sitting in from
+                            // the edge next to the rows below.
+                            .offset(x = 7.dp)
+                            .clip(RoundedCornerShape(KleeampShape.small))
+                            .background(if (p.dark) p.keyFace else p.ground)
+                            .border(1.dp, p.keyBorder, RoundedCornerShape(KleeampShape.small))
+                            .microPress(onClick = onAddCustom),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            // The active filter already reads lit in the chip
-                            // row below; repeating it here only clutters.
-                            val countryQuery = directory.query as? DirectoryQuery.Country
+                        Icon(KleeampIcons.Plus, "add station", Modifier.size(16.dp), tint = p.accent)
+                    }
+                }
+            }
+            items(
+                custom,
+                key = { "cu:${it.url}" },
+            ) { s ->
+                CustomStationRow(
+                    station = s,
+                    active = current?.url == s.url,
+                    playing = playing && current?.url == s.url,
+                    onPlay = { onPlay(s, custom, null) },
+                    onOpenMenu = { menuFor = s },
+                )
+            }
+
+            val dirStations = if (favOnly) favStations else directory.stations
+            // Directory rows keep catalogue paging alive in the player:
+            // next at the end of the loaded page asks this continuation for
+            // the following page, so playback never stops at one page.
+            val dirMore: QueueContinuation? =
+                if (favOnly) null else vm.continuation(directory.query, dirStations.size)
+            item {
+                SectionLabel(
+                    if (favOnly) {
+                        "favorites — ${dirStations.size}"
+                    } else {
+                        "directory — " + (dirStats?.playable?.let { "%,d".format(it) }
+                            ?: if (directory.error != null) "unreachable" else "loading")
+                    },
+                    gutter = 8.dp,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        // The active filter already reads lit in the chip
+                        // row below; repeating it here only clutters.
+                        val countryQuery = directory.query as? DirectoryQuery.Country
+                        Chip(
+                            countryQuery?.countryName ?: "all countries",
+                            selected = countryQuery != null,
+                            onClick = { countrySheet = true },
+                            caret = true,
+                        )
+                    }
+                }
+            }
+            // The directory's filters, one row: trending leads it, then
+            // the tags that narrow the list. Top is the default order
+            // and stays reachable through "all countries".
+            // Gutter-compensated like rows and labels: list padding
+            // plus this lands exactly on the shared gutter.
+            item {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                ) {
+                    Chip(
+                        "top",
+                        directory.query == DirectoryQuery.TopVoted && !favOnly,
+                        onClick = {
+                            favOnly = false
+                            // Already there: refetching would flash loading
+                            // and reshuffle the list the user just left.
+                            if (directory.query != DirectoryQuery.TopVoted) {
+                                vm.onEvent(
+                                    StationsViewModel.Event.LoadDirectory(
+                                        DirectoryQuery.TopVoted,
+                                        reset = true,
+                                    )
+                                )
+                            }
+                        },
+                    )
+                    Chip(
+                        "trending",
+                        directory.query == DirectoryQuery.Trending && !favOnly,
+                        onClick = {
+                            favOnly = false
+                            // Already there: refetching would flash loading
+                            // and reshuffle the list the user just left.
+                            if (directory.query != DirectoryQuery.Trending) {
+                                vm.onEvent(
+                                    StationsViewModel.Event.LoadDirectory(
+                                        DirectoryQuery.Trending,
+                                        reset = true,
+                                    )
+                                )
+                            }
+                        },
+                    )
+                    Chip(
+                        "favorites",
+                        favOnly,
+                        onClick = { favOnly = !favOnly },
+                    )
+                    if (tags.isNotEmpty()) {
+                        tags.take(24).forEach { t ->
+                            val q = directory.query
                             Chip(
-                                countryQuery?.countryName ?: "all countries",
-                                selected = countryQuery != null,
-                                onClick = { countrySheet = true },
-                                caret = true,
+                                t.name,
+                                selected = q is DirectoryQuery.Tag && q.tag == t.name && !favOnly,
+                                onClick = {
+                                    favOnly = false
+                                    if (q != DirectoryQuery.Tag(t.name)) {
+                                        vm.onEvent(
+                                            StationsViewModel.Event.LoadDirectory(
+                                                DirectoryQuery.Tag(t.name),
+                                                reset = true,
+                                            )
+                                        )
+                                    }
+                                },
                             )
                         }
                     }
                 }
-                // The directory's filters, one row: trending leads it, then
-                // the tags that narrow the list. Top is the default order
-                // and stays reachable through "all countries".
-                // Gutter-compensated like rows and labels: list padding
-                // plus this lands exactly on the shared gutter.
-                item {
-                    Row(
-                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(7.dp),
-                    ) {
-                        Chip(
-                            "top",
-                            directory.query == DirectoryQuery.TopVoted && !favOnly,
-                            onClick = {
-                                favOnly = false
-                                // Already there: refetching would flash loading
-                                // and reshuffle the list the user just left.
-                                if (directory.query != DirectoryQuery.TopVoted) {
-                                    vm.onEvent(
-                                        StationsViewModel.Event.LoadDirectory(
-                                            DirectoryQuery.TopVoted,
-                                            reset = true,
-                                        )
-                                    )
-                                }
-                            },
-                        )
-                        Chip(
-                            "trending",
-                            directory.query == DirectoryQuery.Trending && !favOnly,
-                            onClick = {
-                                favOnly = false
-                                // Already there: refetching would flash loading
-                                // and reshuffle the list the user just left.
-                                if (directory.query != DirectoryQuery.Trending) {
-                                    vm.onEvent(
-                                        StationsViewModel.Event.LoadDirectory(
-                                            DirectoryQuery.Trending,
-                                            reset = true,
-                                        )
-                                    )
-                                }
-                            },
-                        )
-                        Chip(
-                            "favorites",
-                            favOnly,
-                            onClick = { favOnly = !favOnly },
-                        )
-                        if (tags.isNotEmpty()) {
-                            tags.take(24).forEach { t ->
-                                val q = directory.query
-                                Chip(
-                                    t.name,
-                                    selected = q is DirectoryQuery.Tag && q.tag == t.name && !favOnly,
-                                    onClick = {
-                                        favOnly = false
-                                        if (q != DirectoryQuery.Tag(t.name)) {
-                                            vm.onEvent(
-                                                StationsViewModel.Event.LoadDirectory(
-                                                    DirectoryQuery.Tag(t.name),
-                                                    reset = true,
-                                                )
-                                            )
-                                        }
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
-                item { Spacer(Modifier.height(6.dp)) }
-                items(
-                    dirStations,
-                    key = { "dir:${it.url}" },
-                ) { s ->
-                    StationRow(
-                        station = s,
-                        active = current?.url == s.url,
-                        playing = playing && current?.url == s.url,
-                        onPlay = { onPlay(s, dirStations, dirMore) },
-                        onOpenMenu = { menuFor = s },
+            }
+            item { Spacer(Modifier.height(6.dp)) }
+            items(
+                dirStations,
+                key = { "dir:${it.url}" },
+            ) { s ->
+                StationRow(
+                    station = s,
+                    active = current?.url == s.url,
+                    playing = playing && current?.url == s.url,
+                    onPlay = { onPlay(s, dirStations, dirMore) },
+                    onOpenMenu = { menuFor = s },
+                )
+            }
+            item {
+                when {
+                    favOnly && dirStations.isEmpty() -> EmptyNote("no favourite stations yet")
+                    favOnly -> Spacer(Modifier.height(8.dp))
+                    directory.error != null -> RetryNote(
+                        message = "couldn't fetch the directory",
+                        prominent = directory.stations.isEmpty(),
+                        onRetry = {
+                            vm.onEvent(
+                                StationsViewModel.Event.LoadDirectory(directory.query, reset = true)
+                            )
+                        },
                     )
-                }
-                item {
-                    when {
-                        favOnly && dirStations.isEmpty() -> EmptyNote("no favourite stations yet")
-                        favOnly -> Spacer(Modifier.height(8.dp))
-                        directory.error != null -> RetryNote(
-                            message = "couldn't fetch the directory",
-                            prominent = directory.stations.isEmpty(),
-                            onRetry = {
-                                vm.onEvent(
-                                    StationsViewModel.Event.LoadDirectory(directory.query, reset = true)
-                                )
-                            },
-                        )
-                        directory.loading -> LoadingNote("loading more…")
-                        directory.exhausted -> EmptyNote("end of ${directory.query.label}")
-                        else -> Spacer(Modifier.height(8.dp))
-                    }
+                    directory.loading -> LoadingNote("loading more…")
+                    directory.exhausted -> EmptyNote("end of ${directory.query.label}")
+                    else -> Spacer(Modifier.height(8.dp))
                 }
             }
 

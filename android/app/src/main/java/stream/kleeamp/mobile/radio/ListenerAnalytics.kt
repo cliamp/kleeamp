@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,6 +31,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import stream.kleeamp.mobile.chrome.KleeampIcons
 import stream.kleeamp.mobile.chrome.SectionLabel
 import stream.kleeamp.mobile.theme.Mono
 import stream.kleeamp.mobile.theme.KleeampShape
@@ -248,8 +251,9 @@ private fun CountrySide(
     modifier: Modifier = Modifier,
 ) {
     val p = LocalPalette.current
-    // Open like the site; the header taps shut to a one-line summary.
-    var open by rememberSaveable { mutableStateOf(true) }
+    // Shut by default so the globe and station list stay in reach; the
+    // header taps open the ranking.
+    var open by rememberSaveable { mutableStateOf(false) }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(9.dp)) {
         Row(
             Modifier.fillMaxWidth()
@@ -267,6 +271,14 @@ private fun CountrySide(
                 "TOP COUNTRIES",
                 KleeampType.meta,
                 p.inkSecondary,
+            )
+            // Disclosure caret: right while shut, down once open. The row's
+            // onClickLabel already names the action, so the glyph is decor.
+            Icon(
+                if (open) KleeampIcons.CaretDown else KleeampIcons.CaretRight,
+                null,
+                Modifier.size(10.dp),
+                tint = p.inkFaint,
             )
         }
         if (open) {

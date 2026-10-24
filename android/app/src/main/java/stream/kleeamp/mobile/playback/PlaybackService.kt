@@ -161,6 +161,12 @@ class PlaybackService : MediaSessionService() {
     @Volatile private var spectrumWanted = true
     private var artworkJob: kotlinx.coroutines.Job? = null
     private var reconnector: Reconnector? = null
+
+    /** When a live station was paused, epoch ms. 0 when no live pause is held. */
+    private var livePausedAtMs = 0L
+
+    /** Item that pause belongs to, so a station switch never inherits the hold. */
+    private var livePausedMediaId: String? = null
     private lateinit var prefs0: stream.kleeamp.mobile.prefs.Prefs
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -666,6 +672,49 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    /**
+     * Remembers that a live station was paused. A track keeps no hold: it
+     * resumes at its own position, where it was left.
+     */
+    private fun noteLivePause() {
+        val station = PlaybackBus.station.value
+        if (station == null || station.isTrack) {
+            clearLivePause()
+            return
+        }
+        // Anchor on the player's own item, not the bus: a pause racing a
+        // station switch would otherwise hold the hold against the wrong one.
+        val id = player.currentMediaItem?.mediaId ?: return
+        livePausedAtMs = System.currentTimeMillis()
+        livePausedMediaId = id
+    }
+
+    /**
+     * A resume on the same live stream after [LIVE_BUFFER_HOLD_MS] jumps to
+     * the live edge instead of replaying the buffer. Every resume funnels
+     * through playWhenReady - the in-app key, the notification, Bluetooth,
+     * Android Auto - so a car that starts playing on reconnect lands here.
+     */
+    private fun rejoinLiveIfStale() {
+        val pausedAt = livePausedAtMs
+        val pausedId = livePausedMediaId
+        clearLivePause()
+        if (pausedAt == 0L) return
+        val fresh = shouldRejoinLive(
+            pausedForMs = System.currentTimeMillis() - pausedAt,
+            pausedStationId = pausedId,
+            currentMediaId = player.currentMediaItem?.mediaId,
+        )
+        if (!fresh) return
+        PlaybackBus.publishStreamTitle("")
+        player.rejoinLiveEdge()
+    }
+
+    private fun clearLivePause() {
+        livePausedAtMs = 0L
+        livePausedMediaId = null
+    }
+
     override fun onTaskRemoved(rootIntent: Intent?) {
         // A radio app that keeps playing after the task is swiped is a bug, not
         // a feature - unless it is actually playing, in which case leave it be.
@@ -786,6 +835,7 @@ class PlaybackService : MediaSessionService() {
             // isPlaying only flips once audio actually flows (READY); intent
             // flips on the tap. Without this, resume sits on the play glyph
             // through the whole buffering stall until first audio.
+            if (playWhenReady) rejoinLiveIfStale() else noteLivePause()
             publishWidgetState()
             syncProgressTicker()
         }

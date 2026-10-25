@@ -9,6 +9,8 @@ import kotlinx.coroutines.launch
 import stream.kleeamp.mobile.radio.DirectoryStats
 import stream.kleeamp.mobile.common.stateInUi
 import stream.kleeamp.mobile.prefs.Prefs
+import stream.kleeamp.mobile.prefs.DEFAULT_SKIP_BACK_SEC
+import stream.kleeamp.mobile.prefs.DEFAULT_SKIP_FWD_SEC
 import stream.kleeamp.mobile.podcasts.CleanupScope
 import stream.kleeamp.mobile.radio.RadioRepository
 import stream.kleeamp.mobile.model.Station
@@ -41,8 +43,8 @@ class SettingsViewModel(
         val resumeLocal: Boolean = false,
         val speedPerSection: Boolean = true,
         val boostPerSection: Boolean = true,
-        val skipBackSec: Int = 15,
-        val skipFwdSec: Int = 30,
+        val skipBackSec: Int = DEFAULT_SKIP_BACK_SEC,
+        val skipFwdSec: Int = DEFAULT_SKIP_FWD_SEC,
         val listenBrainzOn: Boolean = false,
         val scrobbleRadio: Boolean = false,
         val scrobblePending: Int = 0,
@@ -103,8 +105,8 @@ class SettingsViewModel(
         val parallelDownloads: Int = 3,
         val speedPerSection: Boolean = true,
         val boostPerSection: Boolean = true,
-        val skipBackSec: Int = 15,
-        val skipFwdSec: Int = 30,
+        val skipBackSec: Int = DEFAULT_SKIP_BACK_SEC,
+        val skipFwdSec: Int = DEFAULT_SKIP_FWD_SEC,
     )
 
     /** Library counts, scrobble flag and directory stats. */

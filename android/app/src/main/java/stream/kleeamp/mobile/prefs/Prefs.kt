@@ -81,11 +81,11 @@ fun playSectionFor(source: StationSource): PlaySection = when (source) {
 const val MaxBoostDb = 12
 
 /** Skip-key durations on offer, seconds. */
-val SKIP_DURATIONS = listOf(5, 10, 15, 30, 60)
+val SKIP_DURATIONS = listOf(10, 15, 20, 30, 60, 90)
 
 /** Out-of-the-box skip seconds: rewind, forward. */
-const val DEFAULT_SKIP_BACK_SEC = 15
-const val DEFAULT_SKIP_FWD_SEC = 30
+const val DEFAULT_SKIP_BACK_SEC = 10
+const val DEFAULT_SKIP_FWD_SEC = 10
 
 /**
  * Settings only.
@@ -242,11 +242,11 @@ class Prefs(private val context: Context) {
     }
     /** Whether each section keeps its own boost. On by default, like speed. */
     val boostPerSection: Flow<Boolean> = context.settingsStore.data.map { it[K.boostPerSection] ?: true }
-    /** Rewind seconds for the skip-back key; one of 5/10/15/30/60. */
+    /** Rewind seconds for the skip-back key; one of 10/15/20/30/60/90. */
     val skipBackSec: Flow<Int> = context.settingsStore.data.map {
         (it[K.skipBackSec] ?: DEFAULT_SKIP_BACK_SEC).let { v -> if (v in SKIP_DURATIONS) v else DEFAULT_SKIP_BACK_SEC }
     }
-    /** Forward seconds for the skip-forward key; one of 5/10/15/30/60. */
+    /** Forward seconds for the skip-forward key; one of 10/15/20/30/60/90. */
     val skipFwdSec: Flow<Int> = context.settingsStore.data.map {
         (it[K.skipFwdSec] ?: DEFAULT_SKIP_FWD_SEC).let { v -> if (v in SKIP_DURATIONS) v else DEFAULT_SKIP_FWD_SEC }
     }

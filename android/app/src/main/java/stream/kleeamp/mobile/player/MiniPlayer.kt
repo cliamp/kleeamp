@@ -45,6 +45,8 @@ import stream.kleeamp.mobile.art.SeedPlate
 import stream.kleeamp.mobile.model.Station
 import stream.kleeamp.mobile.art.StationArtSource
 import stream.kleeamp.mobile.model.StationSource
+import stream.kleeamp.mobile.prefs.DEFAULT_SKIP_BACK_SEC
+import stream.kleeamp.mobile.prefs.DEFAULT_SKIP_FWD_SEC
 import stream.kleeamp.mobile.theme.KleeampShape
 import stream.kleeamp.mobile.theme.KleeampType
 import stream.kleeamp.mobile.theme.LocalPalette
@@ -52,6 +54,7 @@ import stream.kleeamp.mobile.theme.Mono
 
 /** The lockscreen widget's in-app twin: art plate, one key. */
 @Composable
+@Suppress("LongParameterList")
 fun MiniPlayer(
     station: Station?,
     streamTitle: String,
@@ -63,8 +66,12 @@ fun MiniPlayer(
     /** Elapsed/duration ms: paints the position hairline on tracks. */
     positionMs: Long = 0L,
     durationMs: Long = 0L,
+    skipBackSec: Int = DEFAULT_SKIP_BACK_SEC,
+    skipFwdSec: Int = DEFAULT_SKIP_FWD_SEC,
     onPrev: () -> Unit = {},
     onNext: () -> Unit = {},
+    onSkipBack: () -> Unit = {},
+    onSkipFwd: () -> Unit = {},
     onOpenUpNext: () -> Unit,
     onToggle: () -> Unit,
     onOpen: () -> Unit,
@@ -97,7 +104,7 @@ fun MiniPlayer(
             // Position hairline along the bar's bottom edge on tracks with
             // a known length: overlay only, so the bar measures exactly
             // as before with or without it.
-            if (!empty && station?.isTrack == true && durationMs > 0) {
+            if (!empty && station.isTrack && durationMs > 0) {
                 val done = (positionMs.toFloat() / durationMs).coerceIn(0f, 1f)
                 Box(
                     Modifier
@@ -148,16 +155,27 @@ fun MiniPlayer(
                     .microPress(onClick = onOpenUpNext),
                 tint = p.ink,
             )
+            val isPodcast = station?.source == StationSource.Podcast
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                MiniKey(
-                    icon = KleeampIcons.Prev,
-                    label = "previous",
-                    enabled = hasPrev,
-                    onClick = onPrev,
-                )
+                if (isPodcast) {
+                    MiniKey(
+                        icon = KleeampIcons.Rewind,
+                        label = miniKeyLabel(MiniKeyKind.SkipBack, skipBackSec, skipFwdSec),
+                        enabled = true,
+                        onClick = onSkipBack,
+                        iconModifier = Modifier.size(13.dp),
+                    )
+                } else {
+                    MiniKey(
+                        icon = KleeampIcons.Prev,
+                        label = miniKeyLabel(MiniKeyKind.Prev, skipBackSec, skipFwdSec),
+                        enabled = hasPrev,
+                        onClick = onPrev,
+                    )
+                }
                 Box(
                     Modifier
                         .size(38.dp)
@@ -173,12 +191,22 @@ fun MiniPlayer(
                         tint = if (p.dark) p.onAccent else p.ground,
                     )
                 }
-                MiniKey(
-                    icon = KleeampIcons.Next,
-                    label = "next",
-                    enabled = hasNext,
-                    onClick = onNext,
-                )
+                if (isPodcast) {
+                    MiniKey(
+                        icon = KleeampIcons.Forward,
+                        label = miniKeyLabel(MiniKeyKind.SkipForward, skipBackSec, skipFwdSec),
+                        enabled = true,
+                        onClick = onSkipFwd,
+                        iconModifier = Modifier.size(13.dp),
+                    )
+                } else {
+                    MiniKey(
+                        icon = KleeampIcons.Next,
+                        label = miniKeyLabel(MiniKeyKind.Next, skipBackSec, skipFwdSec),
+                        enabled = hasNext,
+                        onClick = onNext,
+                    )
+                }
             }
             }
         }
@@ -223,12 +251,45 @@ private fun Modifier.swipeToStep(onPrev: () -> Unit, onNext: () -> Unit): Modifi
         )
     }
 
-/** A small prev/next key for the mini bar transport cluster. */@Composable
+/** Kind of key shown on the left/right flanks of the mini bar transport cluster. */
+internal enum class MiniKeyKind {
+    Prev,
+    Next,
+    SkipBack,
+    SkipForward,
+}
+
+/** Pure helper to determine left key type. */
+internal fun miniLeftKeyKind(station: Station?): MiniKeyKind =
+    if (station?.source == StationSource.Podcast) MiniKeyKind.SkipBack else MiniKeyKind.Prev
+
+/** Pure helper to determine right key type. */
+internal fun miniRightKeyKind(station: Station?): MiniKeyKind =
+    if (station?.source == StationSource.Podcast) MiniKeyKind.SkipForward else MiniKeyKind.Next
+
+/** Pure helper to format accessible content description. */
+internal fun miniKeyLabel(kind: MiniKeyKind, skipBackSec: Int, skipFwdSec: Int): String = when (kind) {
+    MiniKeyKind.Prev -> "previous"
+    MiniKeyKind.Next -> "next"
+    MiniKeyKind.SkipBack -> "skip back $skipBackSec seconds"
+    MiniKeyKind.SkipForward -> "skip forward $skipFwdSec seconds"
+}
+
+/** Pure helper for seek delta seconds. */
+internal fun miniKeySeekDelta(kind: MiniKeyKind, skipBackSec: Int, skipFwdSec: Int): Int? = when (kind) {
+    MiniKeyKind.SkipBack -> -skipBackSec
+    MiniKeyKind.SkipForward -> skipFwdSec
+    MiniKeyKind.Prev, MiniKeyKind.Next -> null
+}
+
+/** A small prev/next/skip key for the mini bar transport cluster. */
+@Composable
 private fun MiniKey(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     enabled: Boolean,
     onClick: () -> Unit,
+    iconModifier: Modifier = Modifier.size(width = 14.dp, height = 11.dp),
 ) {
     val p = LocalPalette.current
     Row(
@@ -244,7 +305,7 @@ private fun MiniKey(
         Icon(
             icon,
             label,
-            Modifier.size(width = 14.dp, height = 11.dp),
+            iconModifier,
             tint = if (enabled) p.ink else p.inkFaint,
         )
     }

@@ -53,6 +53,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -67,6 +68,8 @@ import stream.kleeamp.mobile.model.deEchoArtistLine
 import stream.kleeamp.mobile.model.wrapNext
 import stream.kleeamp.mobile.net.Http
 import stream.kleeamp.mobile.widget.WidgetRenderer
+import stream.kleeamp.mobile.prefs.DEFAULT_SKIP_BACK_SEC
+import stream.kleeamp.mobile.prefs.DEFAULT_SKIP_FWD_SEC
 import stream.kleeamp.mobile.prefs.Prefs
 import stream.kleeamp.mobile.prefs.MaxBoostDb
 import stream.kleeamp.mobile.prefs.playSectionFor
@@ -222,6 +225,13 @@ class PlaybackService : MediaSessionService() {
             )
             .build()
 
+        player.setSeekBackIncrementMs(secondsToMs(DEFAULT_SKIP_BACK_SEC))
+        player.setSeekForwardIncrementMs(secondsToMs(DEFAULT_SKIP_FWD_SEC))
+        bindSeekIncrements(prefs0.skipBackSec, prefs0.skipFwdSec, scope) { backMs, fwdMs ->
+            player.setSeekBackIncrementMs(backMs)
+            player.setSeekForwardIncrementMs(fwdMs)
+        }
+
         player.addListener(PlayerEvents())
         player.addAnalyticsListener(FormatEvents())
 
@@ -283,9 +293,13 @@ class PlaybackService : MediaSessionService() {
         // favouriting on the lockscreen where they belong.
         scope.launch {
             val conn = (application as KleeampApp).player
-            combine(prefs0.favorites, conn.shuffle) { favs, shuffled ->
-                val url = PlaybackBus.station.value?.url
-                session?.setMediaButtonPreferences(buttons(favs.any { it.url == url }, shuffled))
+            combine(
+                prefs0.favorites,
+                conn.shuffle,
+                PlaybackBus.station,
+            ) { favs, shuffled, station ->
+                val isFav = station?.let { s -> favs.any { it.url == s.url } } ?: false
+                session?.setMediaButtonPreferences(buttons(station, isFav, shuffled))
             }.collect { }
         }
 
@@ -338,40 +352,10 @@ class PlaybackService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo) = session
 
     private fun buttons(
+        station: Station?,
         isFavourite: Boolean,
         shuffled: Boolean,
-    ): ImmutableList<CommandButton> = ImmutableList.of(
-        CommandButton.Builder(CommandButton.ICON_PREVIOUS)
-            .setDisplayName("Previous")
-            .setIconUri(iconUri(R.drawable.ic_w_prev))
-            .setSessionCommand(SessionCommand(CMD_PREV_STATION, Bundle.EMPTY))
-            .build(),
-        CommandButton.Builder(
-            if (isFavourite) CommandButton.ICON_STAR_FILLED else CommandButton.ICON_STAR_UNFILLED
-        )
-            .setDisplayName(if (isFavourite) "Remove favourite" else "Favourite")
-            // Belt and braces: the provider resolves the resource id while
-            // controllers that load artwork-style URIs take the content URI.
-            .setIconResId(if (isFavourite) R.drawable.ic_w_heart_filled else R.drawable.ic_w_heart)
-            .setIconUri(iconUri(if (isFavourite) R.drawable.ic_w_heart_filled else R.drawable.ic_w_heart))
-            .setSessionCommand(SessionCommand(CMD_FAVOURITE, Bundle.EMPTY))
-            .build(),
-        CommandButton.Builder(
-            if (shuffled) CommandButton.ICON_SHUFFLE_ON else CommandButton.ICON_SHUFFLE_OFF
-        )
-            .setDisplayName(if (shuffled) "Stop shuffling" else "Shuffle")
-            // Same Shuffle glyph as the in-app icon; the on variant carries
-            // the filled dot under it, mirroring the hero ShuffleAction.
-            .setIconResId(if (shuffled) R.drawable.ic_w_shuffle_on else R.drawable.ic_w_shuffle)
-            .setIconUri(iconUri(if (shuffled) R.drawable.ic_w_shuffle_on else R.drawable.ic_w_shuffle))
-            .setSessionCommand(SessionCommand(CMD_SHUFFLE, Bundle.EMPTY))
-            .build(),
-        CommandButton.Builder(CommandButton.ICON_NEXT)
-            .setDisplayName("Next")
-            .setIconUri(iconUri(R.drawable.ic_w_next))
-            .setSessionCommand(SessionCommand(CMD_NEXT_STATION, Bundle.EMPTY))
-            .build(),
-    )
+    ): ImmutableList<CommandButton> = buildMediaButtons(station, isFavourite, shuffled, ::iconUri)
 
     /** android.resource URIs resolve cross-process in SystemUI, like res ids did. */
     private fun iconUri(@DrawableRes resId: Int): Uri =
@@ -400,10 +384,15 @@ class PlaybackService : MediaSessionService() {
                 .add(SessionCommand(CMD_FAVOURITE, Bundle.EMPTY))
                 .add(SessionCommand(CMD_SHUFFLE, Bundle.EMPTY))
                 .build()
+            val station = PlaybackBus.station.value
+            val isFav = station?.let { s ->
+                runBlocking { prefs0.favorites.first().any { it.url == s.url } }
+            } ?: false
+            val shuffled = (application as KleeampApp).player.shuffle.value
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
                 .setAvailableSessionCommands(commands)
                 .setAvailablePlayerCommands(playerCommands)
-                .setMediaButtonPreferences(buttons(false, false))
+                .setMediaButtonPreferences(buttons(station, isFav, shuffled))
                 .build()
         }
 
@@ -572,6 +561,7 @@ class PlaybackService : MediaSessionService() {
             val shuffled = (application as KleeampApp).player.shuffle.value
             session?.setMediaButtonPreferences(
                 buttons(
+                    station,
                     favs.any { it.url == station?.url },
                     shuffled,
                 )
@@ -996,4 +986,86 @@ internal fun effectiveBoostDb(
 ): Int {
     if (!scoped || station == null) return global.coerceIn(0, MaxBoostDb)
     return (sections[playSectionFor(station.source).name] ?: global).coerceIn(0, MaxBoostDb)
+}
+
+/** Convert seek duration in seconds to milliseconds for ExoPlayer seek increments. */
+internal fun secondsToMs(seconds: Int): Long = seconds * 1000L
+
+private fun emptyBundle(): Bundle = Bundle.EMPTY ?: Bundle()
+
+/**
+ * Builds the 4-button media session row for notifications, lock screen, and external controls.
+ * Podcast stations use Skip Back (Rewind) and Skip Forward buttons, while all other sources
+ * (Radio, Local music, Provider tracks) retain Previous and Next station buttons.
+ */
+@UnstableApi
+internal fun buildMediaButtons(
+    station: Station?,
+    isFavourite: Boolean,
+    shuffled: Boolean,
+    iconUriProvider: (Int) -> Uri?,
+): ImmutableList<CommandButton> {
+    val bundle = emptyBundle()
+    val favRes = if (isFavourite) R.drawable.ic_w_heart_filled else R.drawable.ic_w_heart
+    val favBuilder = CommandButton.Builder(
+        if (isFavourite) CommandButton.ICON_STAR_FILLED else CommandButton.ICON_STAR_UNFILLED
+    )
+        .setDisplayName(if (isFavourite) "Remove favourite" else "Favourite")
+        .setIconResId(favRes)
+        .setSessionCommand(SessionCommand(PlaybackService.CMD_FAVOURITE, bundle))
+    iconUriProvider(favRes)?.let { favBuilder.setIconUri(it) }
+    val favBtn = favBuilder.build()
+
+    val shuffleRes = if (shuffled) R.drawable.ic_w_shuffle_on else R.drawable.ic_w_shuffle
+    val shuffleBuilder = CommandButton.Builder(
+        if (shuffled) CommandButton.ICON_SHUFFLE_ON else CommandButton.ICON_SHUFFLE_OFF
+    )
+        .setDisplayName(if (shuffled) "Stop shuffling" else "Shuffle")
+        .setIconResId(shuffleRes)
+        .setSessionCommand(SessionCommand(PlaybackService.CMD_SHUFFLE, bundle))
+    iconUriProvider(shuffleRes)?.let { shuffleBuilder.setIconUri(it) }
+    val shuffleBtn = shuffleBuilder.build()
+
+    val (leftBtn, rightBtn) = if (station?.source == StationSource.Podcast) {
+        val rewind = CommandButton.Builder(CommandButton.ICON_REWIND)
+            .setDisplayName("Skip back")
+            .setPlayerCommand(Player.COMMAND_SEEK_BACK)
+            .build()
+        val forward = CommandButton.Builder(CommandButton.ICON_FAST_FORWARD)
+            .setDisplayName("Skip forward")
+            .setPlayerCommand(Player.COMMAND_SEEK_FORWARD)
+            .build()
+        rewind to forward
+    } else {
+        val prevBuilder = CommandButton.Builder(CommandButton.ICON_PREVIOUS)
+            .setDisplayName("Previous")
+            .setSessionCommand(SessionCommand(PlaybackService.CMD_PREV_STATION, bundle))
+        iconUriProvider(R.drawable.ic_w_prev)?.let { prevBuilder.setIconUri(it) }
+
+        val nextBuilder = CommandButton.Builder(CommandButton.ICON_NEXT)
+            .setDisplayName("Next")
+            .setSessionCommand(SessionCommand(PlaybackService.CMD_NEXT_STATION, bundle))
+        iconUriProvider(R.drawable.ic_w_next)?.let { nextBuilder.setIconUri(it) }
+
+        prevBuilder.build() to nextBuilder.build()
+    }
+
+    return ImmutableList.of(leftBtn, favBtn, shuffleBtn, rightBtn)
+}
+
+/**
+ * Keeps player seek back/forward increments aligned with DataStore preferences.
+ * Runs in [scope] and updates [onIncrementsChanged] whenever either duration changes.
+ */
+internal fun bindSeekIncrements(
+    skipBackFlow: Flow<Int>,
+    skipFwdFlow: Flow<Int>,
+    scope: CoroutineScope,
+    onIncrementsChanged: (backMs: Long, fwdMs: Long) -> Unit,
+): Job = scope.launch {
+    combine(skipBackFlow, skipFwdFlow) { back, fwd ->
+        back to fwd
+    }.collect { (back, fwd) ->
+        onIncrementsChanged(secondsToMs(back), secondsToMs(fwd))
+    }
 }

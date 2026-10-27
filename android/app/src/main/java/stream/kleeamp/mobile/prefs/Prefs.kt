@@ -83,9 +83,15 @@ const val MaxBoostDb = 12
 /** Skip-key durations on offer, seconds. */
 val SKIP_DURATIONS = listOf(10, 15, 20, 30, 60, 90)
 
-/** Out-of-the-box skip seconds: rewind, forward. */
-const val DEFAULT_SKIP_BACK_SEC = 10
-const val DEFAULT_SKIP_FWD_SEC = 10
+/**
+ * Out-of-the-box skip seconds: rewind, forward. Fifteen back and thirty
+ * forward is the shape every player is expected to have, the one a new user
+ * arrives already knowing. The chips in Settings override it per key, so a
+ * listener who prefers 10/10 or 60/90 gets exactly that; nobody is forced
+ * into someone else's taste.
+ */
+const val DEFAULT_SKIP_BACK_SEC = 15
+const val DEFAULT_SKIP_FWD_SEC = 30
 
 /**
  * Settings only.

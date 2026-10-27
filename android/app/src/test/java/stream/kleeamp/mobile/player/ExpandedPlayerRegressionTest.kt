@@ -15,10 +15,10 @@ import stream.kleeamp.mobile.prefs.SKIP_DURATIONS
 class ExpandedPlayerRegressionTest {
 
     @Test
-    fun defaultStateHasTenSecondSkipDurations() {
+    fun defaultStateUsesAppDefaultSkipDurations() {
         val defaultUiState = NowPlayingViewModel.UiState()
-        assertEquals(10, DEFAULT_SKIP_BACK_SEC)
-        assertEquals(10, DEFAULT_SKIP_FWD_SEC)
+        assertEquals(15, DEFAULT_SKIP_BACK_SEC)
+        assertEquals(30, DEFAULT_SKIP_FWD_SEC)
         assertEquals(DEFAULT_SKIP_BACK_SEC, defaultUiState.skipBackSec)
         assertEquals(DEFAULT_SKIP_FWD_SEC, defaultUiState.skipFwdSec)
     }
@@ -111,7 +111,7 @@ class ExpandedPlayerRegressionTest {
         configuredBack = DEFAULT_SKIP_BACK_SEC
         configuredFwd = DEFAULT_SKIP_FWD_SEC
 
-        assertEquals(10, configuredBack)
-        assertEquals(10, configuredFwd)
+        assertEquals(15, configuredBack)
+        assertEquals(30, configuredFwd)
     }
 }

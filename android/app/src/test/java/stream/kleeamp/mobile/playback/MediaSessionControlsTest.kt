@@ -52,8 +52,8 @@ class MediaSessionControlsTest {
 
     @Test
     fun defaultSkipIncrementsMatchDefaults() {
-        assertEquals(10_000L, secondsToMs(DEFAULT_SKIP_BACK_SEC))
-        assertEquals(10_000L, secondsToMs(DEFAULT_SKIP_FWD_SEC))
+        assertEquals(15_000L, secondsToMs(DEFAULT_SKIP_BACK_SEC))
+        assertEquals(30_000L, secondsToMs(DEFAULT_SKIP_FWD_SEC))
     }
 
     @Test

@@ -12,9 +12,9 @@ class SkipDurationsTest {
     }
 
     @Test
-    fun defaultDurationsAreTenSeconds() {
-        assertEquals(10, DEFAULT_SKIP_BACK_SEC)
-        assertEquals(10, DEFAULT_SKIP_FWD_SEC)
+    fun defaultsAreFifteenBackAndThirtyForward() {
+        assertEquals(15, DEFAULT_SKIP_BACK_SEC)
+        assertEquals(30, DEFAULT_SKIP_FWD_SEC)
         assertTrue(DEFAULT_SKIP_BACK_SEC in SKIP_DURATIONS)
         assertTrue(DEFAULT_SKIP_FWD_SEC in SKIP_DURATIONS)
     }

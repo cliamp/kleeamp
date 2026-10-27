@@ -9,6 +9,8 @@ import kotlinx.coroutines.launch
 import stream.kleeamp.mobile.common.stateInUi
 import stream.kleeamp.mobile.playback.effectiveBoostDb
 import stream.kleeamp.mobile.prefs.Prefs
+import stream.kleeamp.mobile.prefs.DEFAULT_SKIP_BACK_SEC
+import stream.kleeamp.mobile.prefs.DEFAULT_SKIP_FWD_SEC
 import stream.kleeamp.mobile.prefs.playSectionFor
 import stream.kleeamp.mobile.model.Station
 import stream.kleeamp.mobile.playback.PlaybackBus
@@ -39,8 +41,8 @@ class NowPlayingViewModel(
         val boostSupported: Boolean = false,
         val boostSections: Boolean = true,
         val showSkipKeys: Boolean = false,
-        val skipBackSec: Int = 15,
-        val skipFwdSec: Int = 30,
+        val skipBackSec: Int = DEFAULT_SKIP_BACK_SEC,
+        val skipFwdSec: Int = DEFAULT_SKIP_FWD_SEC,
     )
 
     sealed interface Event {
@@ -66,8 +68,8 @@ class NowPlayingViewModel(
 
     /** Skip-key durations, chained onto [LibState] below. */
     private data class SkipKeysState(
-        val backSec: Int = 15,
-        val fwdSec: Int = 30,
+        val backSec: Int = DEFAULT_SKIP_BACK_SEC,
+        val fwdSec: Int = DEFAULT_SKIP_FWD_SEC,
     )
 
     /** Library prefs and derived flags that dress the transport. */
@@ -80,8 +82,8 @@ class NowPlayingViewModel(
         val speedSections: Boolean = true,
         val boostSections: Boolean = true,
         val boostMaps: Map<String, Int> = emptyMap(),
-        val skipBackSec: Int = 15,
-        val skipFwdSec: Int = 30,
+        val skipBackSec: Int = DEFAULT_SKIP_BACK_SEC,
+        val skipFwdSec: Int = DEFAULT_SKIP_FWD_SEC,
     )
 
     val state: StateFlow<UiState> = combine(

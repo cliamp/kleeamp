@@ -58,6 +58,9 @@ private const val FIRED_SEEK_HOLD_MS = 2_000L
 /** Close enough to the fired target to call the seek landed. */
 private const val SEEK_LANDED_TOLERANCE_MS = 1_500L
 
+/** Minimum flight time before a fired seek can be declared landed by tolerance. */
+private const val MIN_SEEK_FLIGHT_MS = 300L
+
 /**
  * Which clock the UI reads this tick. Pure so unit tests can pin the
  * priority: a primed/fired seek target wins over the player's still-settling
@@ -99,6 +102,24 @@ internal fun seekByTargetMs(positionMs: Long, durationMs: Long, deltaSec: Int): 
     if (durationMs <= 0 || positionMs < 0) return null
     val end = (durationMs - SEEK_END_MARGIN_MS).coerceAtLeast(0L)
     return (positionMs + deltaSec * 1000L).coerceIn(0L, end)
+}
+
+/**
+ * Determines the playback position to seek from. Prioritizes active pending
+ * and in-flight fired seek targets over stale player clock readings during
+ * rapid skip taps. Pure so it can be unit-tested on the JVM.
+ */
+internal fun resolveSeekBasePosition(
+    pendingTargetMs: Long?,
+    firedTargetMs: Long?,
+    rawPositionMs: Long?,
+    itemMatchesStation: Boolean,
+    statePositionMs: Long,
+): Long = when {
+    pendingTargetMs != null -> pendingTargetMs.coerceAtLeast(0L)
+    firedTargetMs != null -> firedTargetMs.coerceAtLeast(0L)
+    rawPositionMs != null && rawPositionMs >= 0L && itemMatchesStation -> rawPositionMs
+    else -> statePositionMs.coerceAtLeast(0L)
 }
 
 /**
@@ -427,7 +448,10 @@ class PlayerConnection(
             firedSeekStationId = null
         }
         var firedTarget = firedSeekTargetMs
-        if (firedTarget != null && kotlin.math.abs(rawPosition - firedTarget) < SEEK_LANDED_TOLERANCE_MS) {
+        if (firedTarget != null &&
+            nowMs - firedSeekAtMs >= MIN_SEEK_FLIGHT_MS &&
+            kotlin.math.abs(rawPosition - firedTarget) < SEEK_LANDED_TOLERANCE_MS
+        ) {
             firedTarget = null
             firedSeekTargetMs = null
             firedSeekStationId = null
@@ -609,15 +633,24 @@ class PlayerConnection(
         if (!station.isTrack) return
         val c = controller
         val d = c?.duration?.takeIf { it != C.TIME_UNSET && it > 0 }
+            ?: _state.value.durationMs.takeIf { it > 0 && station.id == prevStationId }
             ?: station.durationMs.takeIf { it > 0 }
-            ?: run {
-                // No duration yet: prime the middle so a skip still wakes
-                // the track instead of no-oping; sync refines nothing here.
-                primeSeek(station, 0.5f)
-                return
-            }
-        val pos = (c?.currentPosition?.takeIf { it > 0 } ?: _state.value.positionMs)
-            .coerceAtLeast(0)
+            ?: return
+        val nowMs = System.currentTimeMillis()
+        val pendingTarget = pendingSeekFraction
+            ?.takeIf { pendingSeekStationId == station.id }
+            ?.let { seekTargetMs(d, it) }
+        val firedTarget = firedSeekTargetMs
+            ?.takeIf { firedSeekStationId == station.id && nowMs - firedSeekAtMs < FIRED_SEEK_HOLD_MS }
+        val rawPos = c?.currentPosition?.takeIf { it >= 0 }
+        val itemMatches = c?.currentMediaItem?.mediaId == station.id
+        val pos = resolveSeekBasePosition(
+            pendingTargetMs = pendingTarget,
+            firedTargetMs = firedTarget,
+            rawPositionMs = rawPos,
+            itemMatchesStation = itemMatches,
+            statePositionMs = _state.value.positionMs,
+        )
         val target = seekByTargetMs(pos, d, seconds) ?: return
         primeSeek(station, target.toFloat() / d)
     }
@@ -636,11 +669,12 @@ class PlayerConnection(
             play(station)
             return
         }
-        if (!applyPendingSeek(c)) sync()
+        applyPendingSeek(c)
+        sync()
     }
 
     /** Applies a primed seek when the player can take it. True when fired. */
-    @Suppress("ReturnCount")
+    @Suppress("ReturnCount", "CyclomaticComplexMethod")
     private fun applyPendingSeek(c: Player): Boolean {
         val pending = pendingSeekFraction ?: return false
         val pendingId = pendingSeekStationId ?: return false
@@ -667,6 +701,7 @@ class PlayerConnection(
             return false
         }
         val d = c.duration.takeIf { it != C.TIME_UNSET && it > 0 }
+            ?: _state.value.durationMs.takeIf { it > 0 && stationNow.id == prevStationId }
             ?: stationNow.durationMs.takeIf { it > 0 }
             ?: return false
         val target = seekTargetMs(d, pending)

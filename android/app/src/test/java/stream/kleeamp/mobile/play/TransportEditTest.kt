@@ -12,10 +12,16 @@ class TransportEditTest {
 
     @Test fun seekByMovesForward() {
         assertEquals(45_000L, seekByTargetMs(15_000L, 120_000L, 30))
+        assertEquals(35_000L, seekByTargetMs(15_000L, 120_000L, 20))
+        assertEquals(75_000L, seekByTargetMs(15_000L, 120_000L, 60))
+        assertEquals(105_000L, seekByTargetMs(15_000L, 120_000L, 90))
     }
 
     @Test fun seekByMovesBack() {
         assertEquals(5_000L, seekByTargetMs(15_000L, 120_000L, -10))
+        assertEquals(10_000L, seekByTargetMs(30_000L, 120_000L, -20))
+        assertEquals(30_000L, seekByTargetMs(90_000L, 120_000L, -60))
+        assertEquals(10_000L, seekByTargetMs(100_000L, 120_000L, -90))
     }
 
     @Test fun seekByClampsToZero() {

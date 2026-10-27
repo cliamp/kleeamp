@@ -1086,6 +1086,8 @@ private fun ScopedMiniPlayer(
     onOpen: () -> Unit,
 ) {
     val recent by prefs.history.collectAsState(initial = emptyList())
+    val skipBackSec by prefs.skipBackSec.collectAsState(initial = stream.kleeamp.mobile.prefs.DEFAULT_SKIP_BACK_SEC)
+    val skipFwdSec by prefs.skipFwdSec.collectAsState(initial = stream.kleeamp.mobile.prefs.DEFAULT_SKIP_FWD_SEC)
     val shown = station ?: recent.firstOrNull()
     val inGrace = stream.kleeamp.mobile.player.rememberNavGraceSince(
         stream.kleeamp.mobile.playback.PlaybackBus.stationChangedAtMs,
@@ -1100,8 +1102,12 @@ private fun ScopedMiniPlayer(
         hasNext = hasNext,
         positionMs = positionMs,
         durationMs = durationMs,
+        skipBackSec = skipBackSec,
+        skipFwdSec = skipFwdSec,
         onPrev = { player.prev() },
         onNext = { player.next() },
+        onSkipBack = { player.seekBy(-skipBackSec) },
+        onSkipFwd = { player.seekBy(skipFwdSec) },
         onOpenUpNext = onOpenUpNext,
         onToggle = { player.toggle(station ?: recent.firstOrNull()) },
         onOpen = onOpen,

@@ -115,6 +115,21 @@ object Http {
             .build()
     }
 
+    /**
+     * Lyrics lookups (LRCLib). Lyrics are content the user explicitly opened,
+     * not decoration, so this gets patient timeouts and its own lane: the art
+     * client's tight budgets and per-host caps kept pushing lyric calls into
+     * failures that needed manual retries.
+     */
+    val lyricsClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .callTimeout(25, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .build()
+    }
+
     val json = Json {
         ignoreUnknownKeys = true
         coerceInputValues = true

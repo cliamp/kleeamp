@@ -79,6 +79,7 @@ import stream.kleeamp.mobile.playback.AudioOutputs
 import stream.kleeamp.mobile.playback.OutputKind
 import stream.kleeamp.mobile.playback.PlaybackBus
 import stream.kleeamp.mobile.playback.PlayerState
+import stream.kleeamp.mobile.lyrics.lyricsQuery
 import stream.kleeamp.mobile.chrome.clock
 import stream.kleeamp.mobile.chrome.compact
 import stream.kleeamp.mobile.chrome.BackChevron
@@ -184,6 +185,11 @@ internal fun PortraitPlayer(
     // stable and cannot feed back into the plate size.
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     var plateWidthPx by remember { mutableIntStateOf(0) }
+    // Dimmed when definitively unsearchable: idle, or a stream naming no
+    // title. Pure derivation off the model — no lookup, no traffic.
+    val noLyricsSearch = remember(model.shownStation, model.streamTitle) {
+        lyricsQuery(model.shownStation, model.streamTitle) == null
+    }
     val edge = if (plateWidthPx > 0) {
         // Shaved a little: the rows sit just outside the plate edges so
         // the sides don't read as empty.
@@ -224,6 +230,7 @@ internal fun PortraitPlayer(
         ) {
             BackChevron(actions.onBack)
             Spacer(Modifier.weight(1f))
+            LyricsBadge(actions.onOpenLyrics, dimmed = noLyricsSearch)
             UpNextBadge(model.upNextCount, actions.onOpenUpNext)
         }
         // Tight: buys room back for the plate (see pinned text lines).
@@ -336,6 +343,11 @@ internal fun LandscapePlayer(
 ) {
     // Full-bleed like portrait: the backdrop owns the whole surface and
     // the handle rides inside it, so the container never shows.
+    // Dimmed when definitively unsearchable: idle, or a stream naming no
+    // title. Pure derivation off the model — no lookup, no traffic.
+    val noLyricsSearch = remember(model.shownStation, model.streamTitle) {
+        lyricsQuery(model.shownStation, model.streamTitle) == null
+    }
     Box(
         modifier
             .fillMaxSize()
@@ -404,12 +416,14 @@ internal fun LandscapePlayer(
             Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 // The end padding is the gap: long titles scroll inside
                 // their lane and stop here instead of sticking to the badge.
                 Box(Modifier.weight(1f).padding(end = 12.dp)) {
                     PlayerMeta(model)
                 }
+                LyricsBadge(actions.onOpenLyrics, dimmed = noLyricsSearch)
                 UpNextBadge(model.upNextCount, actions.onOpenUpNext)
             }
             Spacer(Modifier.weight(1f))

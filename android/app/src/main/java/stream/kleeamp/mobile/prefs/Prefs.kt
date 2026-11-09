@@ -134,6 +134,7 @@ class Prefs(private val context: Context) {
         val boostPerSection = booleanPreferencesKey("boost_per_section")
         val skipBackSec = intPreferencesKey("skip_back_sec")
         val skipFwdSec = intPreferencesKey("skip_fwd_sec")
+        val lyricsOffset = intPreferencesKey("lyrics_offset")
         val lbToken = stringPreferencesKey("lb_token")
         val autoResume = booleanPreferencesKey("auto_resume")
         /** Episodes reopen where they stopped. On by default. */
@@ -255,6 +256,10 @@ class Prefs(private val context: Context) {
     /** Forward seconds for the skip-forward key; one of 10/15/20/30/60/90. */
     val skipFwdSec: Flow<Int> = context.settingsStore.data.map {
         (it[K.skipFwdSec] ?: DEFAULT_SKIP_FWD_SEC).let { v -> if (v in SKIP_DURATIONS) v else DEFAULT_SKIP_FWD_SEC }
+    }
+    /** Synced-lyrics offset in ms, ±10s like cliamp's `[`/`]` keys. */
+    val lyricsOffset: Flow<Int> = context.settingsStore.data.map {
+        (it[K.lyricsOffset] ?: 0).coerceIn(-10_000, 10_000)
     }
 
     /** Podcasts subscribed-shows section as a grid. */
@@ -512,6 +517,7 @@ class Prefs(private val context: Context) {
     suspend fun setSkipBackSec(v: Int) = put(K.skipBackSec, if (v in SKIP_DURATIONS) v else DEFAULT_SKIP_BACK_SEC)
     suspend fun setSkipFwdSec(v: Int) = put(K.skipFwdSec, if (v in SKIP_DURATIONS) v else DEFAULT_SKIP_FWD_SEC)
     suspend fun setRepeat(v: String) = put(K.repeat, v)
+    suspend fun setLyricsOffset(v: Int) = put(K.lyricsOffset, v.coerceIn(-10_000, 10_000))
     suspend fun setSubsGrid(v: Boolean) {
         subsGridFlag.value = v
         put(K.subsGrid, v)

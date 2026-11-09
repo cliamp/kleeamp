@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -881,7 +882,23 @@ fun KleeampRoot(
         // composed list: the menu's exact slide, scrim, corners, handle,
         // swipe-down and back-dismiss carry the whole screen, and the
         // previous page shows through instead of an empty page.
+        // One lyrics view model behind both the player key and the sheet it
+        // opens: the key's dim state and the page read the same lookup, and
+        // the player page's visibility is what starts it (see
+        // LyricsViewModel.start).
+        val lyricsVm = app?.let { kleeamp ->
+            appViewModel { LyricsViewModel(kleeamp.player, kleeamp.prefs, kleeamp.lyrics) }
+        }
         if (playerOpen) {
+            // Lyrics lookups follow the player page: opening it lights the
+            // key once the current track's lyrics land, closing it stops the
+            // network work entirely.
+            lyricsVm?.let { vm ->
+                DisposableEffect(vm) {
+                    vm.start()
+                    onDispose { vm.stop() }
+                }
+            }
             NowPlayingSheet(
                 vm = appViewModel { app -> NowPlayingViewModel(app.player, app.prefs) },
                 onOpenScope = { scopeOpen = true },
@@ -912,11 +929,9 @@ fun KleeampRoot(
             )
         }
         if (lyricsOpen) {
-            app?.let { kleeamp ->
+            lyricsVm?.let { vm ->
                 LyricsSheet(
-                    vm = appViewModel { _ ->
-                        LyricsViewModel(kleeamp.player, kleeamp.prefs, kleeamp.lyrics)
-                    },
+                    vm = vm,
                     onDismiss = { lyricsOpen = false },
                 )
             }

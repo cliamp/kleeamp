@@ -98,7 +98,7 @@ class KleeampApp : Application() {
     }
     val downloads: DownloadStore by lazy { DownloadStore(this, prefs, appScope) }
     val scrobbler: Scrobbler by lazy { Scrobbler(this, prefs, appScope) }
-    val lyrics: LyricsRepository by lazy { LyricsRepository(this) }
+    val lyrics: LyricsRepository by lazy { LyricsRepository(this, prefs) }
     val providerRouter: ProviderRouter by lazy { ProviderRouter(ProviderRouter.defaults()) }
 
     /**

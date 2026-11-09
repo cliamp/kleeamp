@@ -632,10 +632,7 @@ class PlayerConnection(
         val station = PlaybackBus.station.value ?: return
         if (!station.isTrack) return
         val c = controller
-        val d = c?.duration?.takeIf { it != C.TIME_UNSET && it > 0 }
-            ?: _state.value.durationMs.takeIf { it > 0 && station.id == prevStationId }
-            ?: station.durationMs.takeIf { it > 0 }
-            ?: return
+        val d = trackDurationMs(station) ?: return
         val nowMs = System.currentTimeMillis()
         val pendingTarget = pendingSeekFraction
             ?.takeIf { pendingSeekStationId == station.id }
@@ -653,6 +650,30 @@ class PlayerConnection(
         )
         val target = seekByTargetMs(pos, d, seconds) ?: return
         primeSeek(station, target.toFloat() / d)
+    }
+
+    /**
+     * Seeks to an absolute time, for tapping a lyric line. Goes through
+     * [primeSeek] like every other seek, so tapping a line on a track that is
+     * still probing starts there instead of being dropped; live streams and
+     * unknown lengths ignore it.
+     */
+    fun seekToMs(ms: Long) {
+        val station = PlaybackBus.station.value ?: return
+        if (!station.isTrack) return
+        val duration = trackDurationMs(station) ?: return
+        primeSeek(station, (ms.toFloat() / duration).coerceIn(0f, 1f))
+    }
+
+    /**
+     * Best-known length for the playing item: the player's own, then the last
+     * reported state when it still describes this station, then the row's.
+     */
+    private fun trackDurationMs(station: Station): Long? {
+        val c = controller
+        return c?.duration?.takeIf { it != C.TIME_UNSET && it > 0 }
+            ?: _state.value.durationMs.takeIf { it > 0 && station.id == prevStationId }
+            ?: station.durationMs.takeIf { it > 0 }
     }
 
     /**

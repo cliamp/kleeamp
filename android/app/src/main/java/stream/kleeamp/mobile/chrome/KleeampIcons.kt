@@ -115,6 +115,19 @@ object KleeampIcons {
         "M13.8 1.4v3.2h-3.2",
     )
 
+    /**
+     * Two chased circular arrows: the lyrics offset key. Refresh and Rewind
+     * arcs point the same way but one arrow reads as "fetch again"; a pair
+     * reads as "line the two up", which is what the key does.
+     */
+    val Sync = stroked(
+        16f, 16f, 1.8f,
+        "M13.8 8a5.8 5.8 0 1 1-1.7-4.1",
+        "M13.8 1.4v3.2h-3.2",
+        "M2.2 8a5.8 5.8 0 1 1 1.7 4.1",
+        "M2.2 14.6v-3.2h3.2",
+    )
+
     /** Looped arrows: two straight shafts with wedge heads, Shuffle-style. */
     val Repeat = stroked(
         18f, 14f, 1.8f,
@@ -253,6 +266,15 @@ object KleeampIcons {
         rrect(4.6f, 0.8f, 4.8f, 7.6f, 2.4f),
         "M2.4 6.6a4.6 4.6 0 0 0 9.2 0",
         "M7 11.2v1.9",
+    )
+    /**
+     * Lyrics: a page with text rails. Stroked like the family so it reads as
+     * words, not as another music note beside the queue glyph.
+     */
+    val Lyrics = stroked(
+        16f, 16f, 1.5f,
+        rrect(2f, 1f, 12f, 14f, 2f),
+        "M5 5h6M5 8h6M5 11h3.5",
     )
     val Plus = solid(14f, 14f, rect(6f, 0f, 2f, 14f), rect(0f, 6f, 14f, 2f))
     val Minus = solid(12f, 12f, rect(0f, 5f, 12f, 2f))

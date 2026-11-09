@@ -64,6 +64,12 @@ object KleeampType {
     val meta = mono(11, FontWeight.Normal, 0.0, 1.35)
     val body = mono(13, FontWeight.Normal, 0.0, 1.6)
 
+    // Lyrics are the content of their page, not a row in a list: a step above
+    // body, with room to breathe. Both weights stay the same size so turning
+    // the active line never re-measures the list.
+    val lyricLine = mono(16, FontWeight.Normal, 0.0, 1.45)
+    val lyricActive = mono(16, FontWeight.Medium, 0.0, 1.45)
+
     // UI chrome: buttons, tabs and settings rows sit at medium so they read a
     // touch heavier than the data lines around them.
     val sectionLabel = mono(11, FontWeight.Medium, 0.14, 1.3)

@@ -46,6 +46,8 @@ class PlaylistDetailViewModel(
 
     sealed interface Event {
         data class ToggleMember(val station: Station) : Event
+        /** Adds every library track inside [path], nested folders included. */
+        data class AddFolder(val path: String) : Event
         data class RemoveMember(val station: Station) : Event
         data class ToggleFavorite(val station: Station) : Event
         data class SetCover(val cover: String) : Event
@@ -130,6 +132,10 @@ class PlaylistDetailViewModel(
             // that must land, not screen-owned work.
             is Event.ToggleMember -> viewModelScope.launch(NonCancellable) {
                 playlists.toggleStation(slug, e.station)
+            }
+            is Event.AddFolder -> viewModelScope.launch(NonCancellable) {
+                val songs = songsUnder(localLibrary.songs.value, e.path)
+                playlists.addSongs(slug, songs.map { it.id })
             }
             is Event.RemoveMember -> viewModelScope.launch(NonCancellable) {
                 playlists.removeSong(slug, e.station.id)

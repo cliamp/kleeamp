@@ -948,6 +948,7 @@ fun KleeampRoot(
                                 showState = ui.showState,
                                 onOpenShow = { vm.onEvent(PlaylistDetailViewModel.Event.OpenShow(it)) },
                                 onToggle = { vm.onEvent(PlaylistDetailViewModel.Event.ToggleMember(it)) },
+                                onAddFolder = { vm.onEvent(PlaylistDetailViewModel.Event.AddFolder(it)) },
                                 onDismiss = { addSongsTarget = null },
                             )
                         }

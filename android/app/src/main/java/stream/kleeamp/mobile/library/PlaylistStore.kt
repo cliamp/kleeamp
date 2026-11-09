@@ -86,15 +86,30 @@ class PlaylistStore(private val context: Context) {
     }
 
     /**
+     * Adds every id not already a member, in order, and returns how many
+     * landed. Folder imports use this: a bulk add must never toggle an
+     * existing member back out the way a picker tap would.
+     */
+    suspend fun addSongs(slug: String, songIds: List<String>): Int = writeMutex.withLock {
+        var added = 0
+        for (id in songIds.distinct()) {
+            if (dao.hasSong(slug, id)) continue
+            dao.addMember(PlaylistMemberEntity(slug, id, dao.nextMemberPosition(slug)))
+            added++
+        }
+        added
+    }
+
+    /**
      * Flips one membership, reading fresh state inside the lock. Checkbox
      * taps resolve direction here — not from the composition-time snapshot
      * that may predate an in-flight write — so rapid taps invert strictly in
      * order instead of collapsing into a single effect. Returns true when
      * the song ends up in the playlist.
      */
-    private val toggleMutex = Mutex()
+    private val writeMutex = Mutex()
 
-    suspend fun toggleStation(slug: String, station: Station): Boolean = toggleMutex.withLock {
+    suspend fun toggleStation(slug: String, station: Station): Boolean = writeMutex.withLock {
         if (dao.hasSong(slug, station.id)) {
             dao.removeMember(slug, station.id)
             false

@@ -1,36 +1,21 @@
 package stream.kleeamp.mobile.servers
 
-
-
-import android.app.Activity
-import android.net.Uri
-import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.IntentSenderRequest
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -40,75 +25,55 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
 import kotlinx.coroutines.launch
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import stream.kleeamp.mobile.art.LocalArt
-import stream.kleeamp.mobile.art.StationArtSource
-import stream.kleeamp.mobile.library.LocalLibrary
-import stream.kleeamp.mobile.library.PlaylistStore
-import stream.kleeamp.mobile.podcasts.PodcastShow
-import stream.kleeamp.mobile.radio.RadioRepository
-import stream.kleeamp.mobile.podcasts.ShowState
-import stream.kleeamp.mobile.model.Station
-import stream.kleeamp.mobile.library.PlaylistGlyph
-import stream.kleeamp.mobile.library.SongCover
-import stream.kleeamp.mobile.radio.DirectoryState
-import stream.kleeamp.mobile.podcasts.EpisodeProgress
-import stream.kleeamp.mobile.model.StationSource
-import stream.kleeamp.mobile.podcasts.toStation
-import stream.kleeamp.mobile.library.durationLabel
-import stream.kleeamp.mobile.podcasts.downloadSizeLabel
-import stream.kleeamp.mobile.chrome.rememberStationThumbnail
-import stream.kleeamp.mobile.chrome.BackChevron
 import stream.kleeamp.mobile.chrome.Chip
 import stream.kleeamp.mobile.chrome.ChipDropdown
 import stream.kleeamp.mobile.chrome.ChipOption
-import stream.kleeamp.mobile.chrome.FilterRow
-import stream.kleeamp.mobile.chrome.KleeampTextField
-import stream.kleeamp.mobile.chrome.Gutter
-import stream.kleeamp.mobile.chrome.HairlineDivider
-import stream.kleeamp.mobile.chrome.ListRow
-import stream.kleeamp.mobile.chrome.OverflowButton
+import stream.kleeamp.mobile.chrome.CollectionActions
+import stream.kleeamp.mobile.chrome.CollectionHeader
 import stream.kleeamp.mobile.chrome.ContextMenuSheet
+import stream.kleeamp.mobile.chrome.FilterRow
+import stream.kleeamp.mobile.chrome.Gutter
+import stream.kleeamp.mobile.chrome.KleeampIcons
+import stream.kleeamp.mobile.chrome.ListRow
+import stream.kleeamp.mobile.chrome.MainLayout
 import stream.kleeamp.mobile.chrome.MenuKind
 import stream.kleeamp.mobile.chrome.MenuSubject
+import stream.kleeamp.mobile.chrome.SectionLabel
 import stream.kleeamp.mobile.chrome.StationMenuArt
 import stream.kleeamp.mobile.chrome.menuActions
-import stream.kleeamp.mobile.chrome.ScreenHeader
-import stream.kleeamp.mobile.chrome.SectionLabel
-import stream.kleeamp.mobile.chrome.scrollToTop
-import stream.kleeamp.mobile.chrome.ArtGlow
-import stream.kleeamp.mobile.chrome.MainLayout
 import stream.kleeamp.mobile.chrome.microPress
-import stream.kleeamp.mobile.theme.KleeampShape
+import stream.kleeamp.mobile.chrome.scrollToTop
+import stream.kleeamp.mobile.library.AlbumGroup
+import stream.kleeamp.mobile.library.ArtistGroup
+import stream.kleeamp.mobile.library.GroupArt
+import stream.kleeamp.mobile.library.LocalSongsTab
+import stream.kleeamp.mobile.library.PlaylistMemberRow
+import stream.kleeamp.mobile.library.albumsOf
+import stream.kleeamp.mobile.library.artistsOf
+import stream.kleeamp.mobile.library.matching
+import stream.kleeamp.mobile.model.Station
+import stream.kleeamp.mobile.prefs.PlaylistSort
+import stream.kleeamp.mobile.prefs.sortedStations
 import stream.kleeamp.mobile.theme.KleeampType
 import stream.kleeamp.mobile.theme.LocalPalette
 import stream.kleeamp.mobile.theme.Mono
-import stream.kleeamp.mobile.prefs.PlaylistSort
-import stream.kleeamp.mobile.prefs.sortedStations
 
-
-/** One provider album row for the providers drill: name, song count, year. */
-private data class ProviderAlbumRow(val name: String, val count: Int, val year: Int)
-
+/**
+ * A provider account's songs, browsed exactly like the local-songs page:
+ * pinned songs/albums/artists tabs, the same title/artist/album/recently-added
+ * sorts on the songs tab, album rows with their group art, and real artist and
+ * album destinations so navigation and predictive back behave like the local
+ * library. One pane serves every provider - Plex, Jellyfin/Emby, Subsonic,
+ * Audiobookshelf, Lyrion and SSH - because the view model has already
+ * flattened each server's responses into [Station]s.
+ */
 @Composable
+// Screen signature: state in, callbacks out; bundling would hide the data flow.
+@Suppress("LongParameterList")
 fun ProviderSongsPane(
     vm: ProviderSongsViewModel,
     current: Station?,
@@ -123,257 +88,215 @@ fun ProviderSongsPane(
     onOpenSettings: () -> Unit = {},
     /** Non-blank locks the pane to one account with no picker row. */
     accountId: String = "",
+    shuffled: Boolean = false,
+    onToggleShuffle: () -> Unit = {},
+    /** Opens the artist destination; [coverUrl] is the row's cover song. */
+    onOpenArtist: (String, String) -> Unit = { _, _ -> },
+    /** Opens the album destination, scoped to its album artist. */
+    onOpenAlbum: (String, String) -> Unit = { _, _ -> },
 ) {
     val p = LocalPalette.current
     val ui by vm.state.collectAsState()
     // A locked pane shows that account only, with no picker: the row it came
     // from already named it.
     val accounts = remember(ui.accounts, accountId) {
-        if (accountId.isBlank()) ui.accounts
-        else ui.accounts.filter { it.id == accountId }
+        if (accountId.isBlank()) ui.accounts else ui.accounts.filter { it.id == accountId }
     }
     var selected by rememberSaveable(accountId) { mutableStateOf(accounts.firstOrNull()?.id) }
     // A removed account must not leave the filter pointing at nothing.
     LaunchedEffect(accounts) {
         if (accounts.none { it.id == selected }) selected = accounts.firstOrNull()?.id
     }
-    var sort by rememberSaveable { mutableStateOf(PlaylistSort.Title) }
+    var sort by rememberSaveable(accountId) { mutableStateOf(PlaylistSort.Title) }
     var query by rememberSaveable { mutableStateOf("") }
+    var tabOrdinal by rememberSaveable { mutableStateOf(0) }
+    val tab = LocalSongsTab.entries.getOrElse(tabOrdinal) { LocalSongsTab.Songs }
     // The row menu's subject: set by the ⋮ trigger, cleared on dismiss.
     var menuFor by remember { mutableStateOf<Station?>(null) }
-    var selectedArtist by rememberSaveable { mutableStateOf<String?>(null) }
-    var selectedAlbum by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val account = accounts.firstOrNull { it.id == selected }
+    // SSH is the only provider that indexes locally, so its live scan state
+    // rides above the list where it can be collected with a stable key.
+    val indexState by SftpLibrary.status(account?.id.orEmpty()).collectAsState()
+    val libraries = if (account?.providerKey == "plex" || account?.providerKey == "abs") {
+        ui.librariesByAccount[selected].orEmpty()
+    } else {
+        emptyList()
+    }
+    val showSort = tab == LocalSongsTab.Songs
+    val showControls = showSort ||
+        account?.providerKey == "ssh" ||
+        libraries.size > 1
     val pool = ui.songsByAccount[selected].orEmpty()
-    val browsingArtists = sort == PlaylistSort.Artist && selectedArtist == null
-    val browsingAlbums = sort == PlaylistSort.Artist && selectedArtist != null && selectedAlbum == null
-    val artistRows = remember(pool, sort, query) {
-        if (sort != PlaylistSort.Artist) emptyList() else {
-            val q = query.trim().lowercase()
-            pool.groupBy { it.artist.ifBlank { "unknown artist" } }
-                .filterKeys { q.isBlank() || it.lowercase().contains(q) }
-                .toSortedMap(compareBy { it.lowercase() })
-                .map { (name, songs) -> name to songs.size }
-        }
-    }
-    val albumYears = ui.albumYearsByAccount[selected].orEmpty()
-    val albumRows = remember(pool, sort, selectedArtist, query, albumYears) {
-        val artist = selectedArtist
-        if (!browsingAlbums || artist == null) emptyList() else {
-            val q = query.trim().lowercase()
-            pool.filter { it.artist.ifBlank { "unknown artist" } == artist }
-                .groupBy { it.album.ifBlank { "unknown album" } }
-                .filterKeys { q.isBlank() || it.lowercase().contains(q) }
-                .map { (name, songs) ->
-                    ProviderAlbumRow(name, songs.size, albumYears[albumYearKey(artist, name)] ?: 0)
-                }
-                // Chronological, oldest first; albums with no known year sort
-                // last by name rather than pretending to be from year zero.
-                .sortedWith(
-                    compareBy<ProviderAlbumRow> { it.year <= 0 }
-                        .thenBy { it.year }
-                        .thenBy { it.name.lowercase() },
-                )
-        }
-    }
-    val visible = remember(pool, sort, query, selectedArtist, selectedAlbum) {
-        val songsOfAlbum = sort == PlaylistSort.Artist && selectedArtist != null && selectedAlbum != null
-        val scoped = when {
-            songsOfAlbum ->
-                pool.filter {
-                    it.artist.ifBlank { "unknown artist" } == selectedArtist &&
-                        it.album.ifBlank { "unknown album" } == selectedAlbum
-                }
-            sort != PlaylistSort.Artist -> pool
-            else -> emptyList()
-        }
-        val q = query.trim().lowercase()
-        val matching = if (q.isBlank()) scoped else scoped.filter {
-            it.name.lowercase().contains(q) || it.artist.lowercase().contains(q) || it.album.lowercase().contains(q)
-        }
-        // An album's tracks are already in the server's track-number order;
-        // re-sorting them alphabetically would scramble the album's own
-        // running order, so only the other views get a client-side sort.
-        if (songsOfAlbum) {
-            matching
-        } else {
-            sortedStations(matching, if (sort == PlaylistSort.Artist) PlaylistSort.Title else sort)
-        }
+    val filtered = remember(pool, query) { pool.matching(query) }
+    // The exact local-songs ordering and grouping: one set of algorithms for
+    // every provider, not a provider-flavoured copy.
+    val ordered = remember(filtered, sort) { sortedStations(filtered, sort) }
+    val albumGroups = remember(ordered) { albumsOf(ordered) }
+    val artistGroups = remember(ordered) { artistsOf(ordered) }
+    val rootTitle = when {
+        accountId.isBlank() && accounts.size > 1 -> "providers"
+        else -> account?.displayName()?.ifBlank { null } ?: "provider"
     }
     val favorites = ui.favorites.map { it.url }.toSet()
     val failedLabels = ui.failures.keys.mapNotNull { id ->
         accounts.firstOrNull { it.id == id }?.displayName()?.ifBlank { null }
     }
-    fun pop() {
-        when {
-            selectedAlbum != null -> { selectedAlbum = null; query = "" }
-            selectedArtist != null -> { selectedArtist = null; query = "" }
-            else -> onBack()
+
+    fun playAll(songs: List<Station>) {
+        songs.firstOrNull()?.let { onPlay(it, songs) }
+    }
+    fun shufflePlay(songs: List<Station>) {
+        if (!shuffled) {
+            onToggleShuffle()
+            songs.randomOrNull()?.let { onPlay(it, songs) }
+        } else {
+            // Second tap turns it off; the current track keeps playing.
+            onToggleShuffle()
         }
     }
-    BackHandler(enabled = selectedArtist != null) { pop() }
+
     Box(Modifier.fillMaxSize().background(p.ground)) {
         val scope = rememberCoroutineScope()
         val listState = rememberLazyListState()
         MainLayout(
-            title = if (accountId.isBlank()) {
-                selectedAlbum ?: selectedArtist ?: "providers"
-            } else {
-                accounts.firstOrNull()?.displayName()?.ifBlank { "provider" } ?: "provider"
-            },
+            title = rootTitle,
             onOpenSearch = onOpenSearch,
             onOpenSettings = onOpenSettings,
             onTitleClick = { scope.scrollToTop(listState) },
-            onBack = { pop() },
-            chips = if (accounts.size > 1) {
-                @Composable {
-                    accounts.forEach { a ->
-                        Chip(
-                            a.displayName().ifBlank { "provider" },
-                            selected == a.id,
-                            onClick = {
-                                selected = a.id; query = ""; selectedArtist = null; selectedAlbum = null
+            onBack = onBack,
+            chips = {
+                LocalSongsTab.entries.forEach { t ->
+                    // The snap lives on the tap, never in an effect: coming
+                    // back from an album/artist keeps the position.
+                    Chip(t.label, tab == t, onClick = {
+                        if (tab != t) {
+                            tabOrdinal = t.ordinal
+                            query = ""
+                            scope.launch { listState.scrollToItem(0) }
+                        }
+                    })
+                }
+            },
+        ) {
+            LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState) {
+                if (accounts.size > 1) {
+                    item {
+                        Row(
+                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                                .padding(start = Gutter, end = Gutter, top = 10.dp, bottom = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                        ) {
+                            accounts.forEach { a ->
+                                Chip(
+                                    a.displayName().ifBlank { "provider" },
+                                    selected == a.id,
+                                    onClick = {
+                                        selected = a.id
+                                        query = ""
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+                item {
+                    CollectionHeader(
+                        title = rootTitle,
+                        meta = when {
+                            pool.isNotEmpty() -> "${pool.size} songs"
+                            ui.loading -> "loading…"
+                            else -> ""
+                        },
+                        actions = {
+                            CollectionActions(
+                                shuffled = shuffled,
+                                onPlayAll = { playAll(ordered) },
+                                onShufflePlay = { shufflePlay(ordered) },
+                            )
+                        },
+                        art = {
+                            GroupArt(
+                                songs = pool.take(4),
+                                modifier = Modifier.fillMaxSize(),
+                                fallbackKey = account?.id.orEmpty(),
+                                fallbackName = rootTitle,
+                            )
+                        },
+                    )
+                }
+                // Library picker and SSH rescan stay on the root. On the songs
+                // tab the sort chips join them; albums and artists are already
+                // grouped, exactly like the local-songs page.
+                if (showControls) {
+                    item {
+                        ProviderSortRow(
+                            sort = sort,
+                            onSort = { sort = it },
+                            rescanVisible = account?.providerKey == "ssh",
+                            rescanning = indexState.scanning,
+                            onRescan = {
+                                account?.let { scope.launch { SftpLibrary.rescan(it) } }
                             },
+                            libraries = libraries,
+                            currentLibraryId = account?.values?.get("library"),
+                            onPickLibrary = { libId ->
+                                account?.let {
+                                    vm.onEvent(
+                                        ProviderSongsViewModel.Event.SetLibrary(it.id, libId)
+                                    )
+                                }
+                                query = ""
+                            },
+                            showSort = showSort,
                         )
                     }
                 }
-            } else null,
-        ) {
-            LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState) {
-                // Picker rows scroll with the list; only the header is
-                // fixed. What is browsed leads the row, always on screen.
-                item {
-                    val selectedAccount = accounts.firstOrNull { it.id == selected }
-                    val indexState by SftpLibrary
-                        .status(selectedAccount?.id.orEmpty())
-                        .collectAsState()
-                    ProviderSortRow(
-                        sort = sort,
-                        onSort = {
-                            sort = it
-                            query = ""
-                            selectedArtist = null
-                            selectedAlbum = null
-                        },
-                        rescanVisible = selectedAccount?.providerKey == "ssh",
-                        rescanning = indexState.scanning,
-                        onRescan = {
-                            selectedAccount?.let { scope.launch { SftpLibrary.rescan(it) } }
-                        },
-                        libraries = if (
-                            selectedAccount?.providerKey == "plex" ||
-                            selectedAccount?.providerKey == "abs"
-                        ) {
-                            ui.librariesByAccount[selected].orEmpty()
-                        } else emptyList(),
-                        currentLibraryId = selectedAccount?.values?.get("library"),
-                        onPickLibrary = { libId ->
-                            selectedAccount?.let {
-                                vm.onEvent(
-                                    ProviderSongsViewModel.Event.SetLibrary(it.id, libId)
-                                )
-                            }
-                            query = ""
-                            selectedArtist = null
-                            selectedAlbum = null
-                        },
-                    )
-                }
                 item { FilterRow(value = query, onValue = { query = it }) }
-                item {
-                    // Adding happens on the providers page; this page only
-                    // shows what is already connected.
-                    SectionLabel(
-                        when {
-                            browsingArtists -> "artists — ${artistRows.size}"
-                            browsingAlbums -> "albums — ${albumRows.size}"
-                            else -> "songs — ${visible.size}"
-                        },
-                    )
-                }
-                if (browsingArtists) {
-                    if (artistRows.isEmpty()) {
-                        item {
-                            Box(
-                                Modifier.fillMaxWidth().padding(vertical = 24.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Mono(
-                                    if (ui.loading) "loading provider songs…" else "nothing here",
-                                    KleeampType.rowSecondary, p.inkFaint,
+                when (tab) {
+                    LocalSongsTab.Songs -> {
+                        if (ordered.isEmpty()) {
+                            item { ProviderEmpty(emptyLabel(loading = ui.loading, query = query)) }
+                        } else {
+                            // The local-songs page leads its rows with the list
+                            // count; providers keep the same marker.
+                            item { SectionLabel("$rootTitle — ${ordered.size}") }
+                            items(ordered, key = { it.id }, contentType = { "provider-song" }) { s ->
+                                ProviderSongRow(
+                                    s = s,
+                                    current = current,
+                                    playing = playing,
+                                    queue = ordered,
+                                    onPlay = onPlay,
+                                    onOpenMenu = { menuFor = it },
                                 )
                             }
                         }
-                    } else {
-                        items(artistRows, key = { it.first }, contentType = { "provider-artist" }) { (name, count) ->
-                            ListRow(
-                                onClick = { selectedArtist = name; selectedAlbum = null; query = "" },
-                                verticalPadding = 11.dp,
-                                trailing = { Mono("$count", KleeampType.meta, p.inkFaint) },
-                            ) {
-                                Mono(name, KleeampType.rowPrimary, p.ink, maxLines = 1)
+                    }
+                    LocalSongsTab.Albums -> {
+                        if (albumGroups.isEmpty()) {
+                            item { ProviderEmpty(emptyLabel(loading = ui.loading, query = query)) }
+                        } else {
+                            items(albumGroups, key = { it.key }, contentType = { "provider-album" }) { group ->
+                                ProviderAlbumRow(
+                                    group = group,
+                                    onOpen = { onOpenAlbum(group.name, group.albumArtist) },
+                                )
                             }
                         }
                     }
-                } else if (browsingAlbums) {
-                    if (albumRows.isEmpty()) {
-                        item {
-                            Box(
-                                Modifier.fillMaxWidth().padding(vertical = 24.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Mono("nothing here", KleeampType.rowSecondary, p.inkFaint)
+                    LocalSongsTab.Artists -> {
+                        if (artistGroups.isEmpty()) {
+                            item { ProviderEmpty(emptyLabel(loading = ui.loading, query = query)) }
+                        } else {
+                            items(artistGroups, key = { it.key }, contentType = { "provider-artist" }) { group ->
+                                ProviderArtistRow(
+                                    group = group,
+                                    onOpen = {
+                                        onOpenArtist(group.name, group.coverSong?.url.orEmpty())
+                                    },
+                                )
                             }
-                        }
-                    } else {
-                        items(albumRows, key = { it.name }, contentType = { "provider-album" }) { row ->
-                            ListRow(
-                                onClick = { selectedAlbum = row.name; query = "" },
-                                verticalPadding = 11.dp,
-                                trailing = { Mono("${row.count}", KleeampType.meta, p.inkFaint) },
-                            ) {
-                                Mono(row.name, KleeampType.rowPrimary, p.ink, maxLines = 1)
-                                if (row.year > 0) {
-                                    Mono("${row.year}", KleeampType.rowSecondary, p.inkTertiary, maxLines = 1)
-                                }
-                            }
-                        }
-                    }
-                } else if (visible.isEmpty()) {
-                    item {
-                        Box(Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
-                            Mono(
-                                when {
-                                    accounts.isEmpty() -> "no providers yet — add one with +"
-                                    ui.loading -> "loading provider songs…"
-                                    else -> "nothing here"
-                                },
-                                KleeampType.rowSecondary, p.inkFaint,
-                            )
-                        }
-                    }
-                } else {
-                    items(visible, key = { it.id }, contentType = { "provider-song" }) { s ->
-                        ListRow(
-                            rail = current?.url == s.url,
-                            onClick = { onPlay(s, visible) },
-                            verticalPadding = 9.dp,
-                            leading = {
-                                SongCover(s = s, current = current, playing = playing)
-                            },
-                            trailing = {
-                                OverflowButton({ menuFor = s }, size = 16)
-                            },
-                        ) {
-                            Mono(
-                                s.name,
-                                KleeampType.rowPrimary,
-                                if (current?.url == s.url) p.accent else p.ink,
-                                maxLines = 1,
-                            )
-                            Mono(
-                                s.artistAlbum.ifBlank { s.meta.ifBlank { "provider" } },
-                                KleeampType.rowSecondary, p.inkTertiary, maxLines = 1,
-                            )
                         }
                     }
                 }
@@ -424,11 +347,103 @@ fun ProviderSongsPane(
     }
 }
 
+/** One provider song row: cover, alias/album subtitle, overflow menu. */
+@Composable
+private fun ProviderSongRow(
+    s: Station,
+    current: Station?,
+    playing: Boolean,
+    queue: List<Station>,
+    onPlay: (Station, List<Station>) -> Unit,
+    onOpenMenu: (Station) -> Unit,
+) {
+    PlaylistMemberRow(
+        s = s,
+        subtitle = s.artistAlbum.ifBlank { s.meta.ifBlank { "provider" } },
+        current = current,
+        playing = playing,
+        queue = queue,
+        onPlay = onPlay,
+        onOpenMenu = onOpenMenu,
+    )
+}
+
+/** One album row for the albums tab. */
+@Composable
+private fun ProviderAlbumRow(group: AlbumGroup, onOpen: () -> Unit) {
+    val p = LocalPalette.current
+    ListRow(
+        onClick = onOpen,
+        verticalPadding = 9.dp,
+        leading = {
+            GroupArt(
+                songs = group.songs,
+                modifier = Modifier.size(40.dp),
+                fallbackKey = group.key,
+                fallbackName = group.name,
+            )
+        },
+        trailing = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Mono("${group.songs.size}", KleeampType.meta, p.inkFaint)
+                Icon(KleeampIcons.CaretRight, "open", Modifier.size(9.dp), tint = p.inkFaint)
+            }
+        },
+    ) {
+        Mono(group.name, KleeampType.rowPrimary, p.ink, maxLines = 1)
+        Mono(group.displayArtist, KleeampType.rowSecondary, p.inkTertiary, maxLines = 1)
+    }
+}
+
+/** One artist row: the artist's first cover, song count and a drill caret. */
+@Composable
+private fun ProviderArtistRow(group: ArtistGroup, onOpen: () -> Unit) {
+    val p = LocalPalette.current
+    ListRow(
+        onClick = onOpen,
+        verticalPadding = 9.dp,
+        leading = {
+            GroupArt(
+                songs = listOfNotNull(group.coverSong),
+                modifier = Modifier.size(40.dp),
+                fallbackKey = group.key,
+                fallbackName = group.name,
+            )
+        },
+        trailing = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Mono("${group.songs.size}", KleeampType.meta, p.inkFaint)
+                Icon(KleeampIcons.CaretRight, "open", Modifier.size(9.dp), tint = p.inkFaint)
+            }
+        },
+    ) {
+        Mono(group.name, KleeampType.rowPrimary, p.ink, maxLines = 1)
+    }
+}
+
+@Composable
+private fun ProviderEmpty(text: String) {
+    Box(Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
+        Mono(text, KleeampType.rowSecondary, LocalPalette.current.inkFaint)
+    }
+}
+
+private fun emptyLabel(loading: Boolean, query: String): String = when {
+    query.isNotBlank() -> "nothing matches"
+    loading -> "loading provider songs…"
+    else -> "nothing here"
+}
+
 /**
- * The provider songs sort row: what is browsed leads, always on screen,
- * then the sort chips. Plex/Audiobookshelf accounts with several libraries
- * get the library picker first; SSH accounts get rescan. Pure state in,
- * callbacks out, so previews can render it without an account.
+ * The provider sort row: library picker and SSH rescan, then the songs-tab
+ * sort chips. Pure state in, callbacks out, so previews can render it without
+ * an account.
  */
 @Composable
 // Screen signature: state in, callbacks out; bundling would hide the data flow.
@@ -442,12 +457,14 @@ internal fun ProviderSortRow(
     libraries: List<ProviderLibrary>,
     currentLibraryId: String?,
     onPickLibrary: (String) -> Unit,
+    showSort: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Row(
         modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
             .padding(start = Gutter, end = Gutter, top = 10.dp, bottom = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         if (rescanVisible) {
             Chip(
@@ -457,18 +474,17 @@ internal fun ProviderSortRow(
             )
         }
         if (libraries.size > 1) {
-            val current =
-                libraries.firstOrNull { it.id == currentLibraryId } ?: libraries.first()
+            val current = libraries.firstOrNull { it.id == currentLibraryId } ?: libraries.first()
             ChipDropdown(
                 label = current.name,
                 selected = currentLibraryId?.isNotBlank() == true,
-                options = libraries.map { lib ->
-                    ChipOption(lib.name) { onPickLibrary(lib.id) }
-                },
+                options = libraries.map { lib -> ChipOption(lib.name) { onPickLibrary(lib.id) } },
             )
         }
-        PlaylistSort.entries.forEach { s ->
-            Chip(s.label, sort == s, onClick = { onSort(s) })
+        if (showSort) {
+            PlaylistSort.entries.forEach { s ->
+                Chip(s.label, sort == s, onClick = { onSort(s) })
+            }
         }
     }
 }

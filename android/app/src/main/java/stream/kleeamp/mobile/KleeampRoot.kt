@@ -80,6 +80,9 @@ import stream.kleeamp.mobile.library.AddSongsSheet
 import stream.kleeamp.mobile.library.AddSongsTarget
 import stream.kleeamp.mobile.library.AddToPlaylistSheet
 import stream.kleeamp.mobile.servers.LibraryProvidersPane
+import stream.kleeamp.mobile.servers.ProviderAlbumPane
+import stream.kleeamp.mobile.servers.ProviderArtistPane
+import stream.kleeamp.mobile.servers.ProviderCollectionViewModel
 import stream.kleeamp.mobile.library.LibrarySmartPlaylistPane
 import stream.kleeamp.mobile.library.LibrarySongInfoPane
 import stream.kleeamp.mobile.library.LibraryScreen
@@ -572,6 +575,90 @@ fun KleeampRoot(
                         onBack = { navController.popBackStack() },
                         onOpenSearch = { navController.navigate(Search) },
                         onOpenSettings = { navController.navigate(Settings) },
+                        shuffled = shuffled,
+                        onToggleShuffle = { player.toggleShuffle() },
+                        onOpenArtist = { name, coverUrl ->
+                            navController.navigate(LibraryProviderArtist(songsAccountId, name, coverUrl))
+                        },
+                        onOpenAlbum = { name, albumArtist ->
+                            navController.navigate(
+                                LibraryProviderAlbum(songsAccountId, name, albumArtist),
+                            )
+                        },
+                    )
+                }
+            }
+            composable<LibraryProviderArtist> { entry ->
+                val route = entry.toRoute<LibraryProviderArtist>()
+                Box(contentModifier) {
+                    ProviderArtistPane(
+                        vm = appViewModel(key = "provider-artist:${route.accountId}:${route.name}") { app ->
+                            ProviderCollectionViewModel(
+                                accountId = route.accountId,
+                                album = "",
+                                albumArtist = "",
+                                artist = route.name,
+                                store = app.providers,
+                                prefs = app.prefs,
+                            )
+                        },
+                        artist = route.name,
+                        coverUrl = route.coverUrl,
+                        current = station,
+                        playing = playerState.playing,
+                        onPlay = { s, from -> play(s, from, null) },
+                        onOpenAlbum = { name, albumArtist ->
+                            navController.navigate(
+                                LibraryProviderAlbum(
+                                    route.accountId,
+                                    name,
+                                    albumArtist,
+                                    artist = route.name,
+                                ),
+                            )
+                        },
+                        onAddToQueue = { player.addToUpNext(it) },
+                        onPlayNext = { player.playNext(it) },
+                        onAddToPlaylist = { s -> addToPlaylistStation = s },
+                        onInfo = { s -> navController.navigate(LibrarySongInfo(s.url)) },
+                        onBack = { navController.popBackStack() },
+                        onOpenSearch = { navController.navigate(Search) },
+                        onOpenSettings = { navController.navigate(Settings) },
+                        shuffled = shuffled,
+                        onToggleShuffle = { player.toggleShuffle() },
+                    )
+                }
+            }
+            composable<LibraryProviderAlbum> { entry ->
+                val route = entry.toRoute<LibraryProviderAlbum>()
+                val vmKey = "provider-album:${route.accountId}:${route.albumArtist}:" +
+                    "${route.name}:${route.artist}"
+                Box(contentModifier) {
+                    ProviderAlbumPane(
+                        vm = appViewModel(key = vmKey) { app ->
+                            ProviderCollectionViewModel(
+                                accountId = route.accountId,
+                                album = route.name,
+                                albumArtist = route.albumArtist,
+                                artist = route.artist,
+                                store = app.providers,
+                                prefs = app.prefs,
+                            )
+                        },
+                        album = route.name,
+                        albumArtist = route.albumArtist,
+                        current = station,
+                        playing = playerState.playing,
+                        onPlay = { s, from -> play(s, from, null) },
+                        onAddToQueue = { player.addToUpNext(it) },
+                        onPlayNext = { player.playNext(it) },
+                        onAddToPlaylist = { s -> addToPlaylistStation = s },
+                        onInfo = { s -> navController.navigate(LibrarySongInfo(s.url)) },
+                        onBack = { navController.popBackStack() },
+                        onOpenSearch = { navController.navigate(Search) },
+                        onOpenSettings = { navController.navigate(Settings) },
+                        shuffled = shuffled,
+                        onToggleShuffle = { player.toggleShuffle() },
                     )
                 }
             }

@@ -33,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import stream.kleeamp.mobile.art.SeedPlate
 import stream.kleeamp.mobile.model.Station
@@ -467,7 +468,10 @@ internal fun SheetStatusBarIcons() {
  * fit: constant like a menu, roomier for long pickers. [bodyFraction]
  * fixes any other fraction; [scrollBody] goes false when the body hosts
  * its own scrolling lists, which must never sit inside another scroll.
- * A drag up has nowhere to expand to, so the list inside scrolls.
+ * [bodyGutter] insets the body; a picker whose rows already carry their
+ * own [Gutter] passes 0.dp so the body lines up with the header instead
+ * of stacking a second inset on every row. A drag up has nowhere to
+ * expand to, so the list inside scrolls.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -477,6 +481,7 @@ fun MenuSheetShell(
     halfHeight: Boolean = false,
     bodyFraction: Float? = null,
     scrollBody: Boolean = true,
+    bodyGutter: Dp = Gutter,
     content: @Composable () -> Unit,
 ) {
     val p = LocalPalette.current
@@ -493,11 +498,15 @@ fun MenuSheetShell(
         },
     ) {
         SheetStatusBarIcons()
-        Column(Modifier.fillMaxWidth().padding(horizontal = Gutter)) {
-            header()
-            HairlineDivider(region = true)
+        Column(Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = Gutter)) {
+                header()
+                HairlineDivider(region = true)
+            }
             Column(
                 Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = bodyGutter)
                     .then(
                         when {
                             bodyFraction != null -> Modifier.fillMaxHeight(bodyFraction)

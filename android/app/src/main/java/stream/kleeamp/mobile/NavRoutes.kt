@@ -30,6 +30,25 @@ import kotlinx.serialization.Serializable
 @Serializable data object LibraryProviders
 /** Blank [accountId] shows every account with the picker; set locks to one. */
 @Serializable data class LibraryProviderSongs(val accountId: String = "")
+/**
+ * One provider artist's tracks. [coverUrl] is the row's cover song, exactly
+ * like the local artist route, so the header wears the same image.
+ */
+@Serializable data class LibraryProviderArtist(
+    val accountId: String,
+    val name: String,
+    val coverUrl: String = "",
+)
+/**
+ * One provider album's tracks. [artist] is set when opened from a provider
+ * artist page, narrowing the album the same way the local album route does.
+ */
+@Serializable data class LibraryProviderAlbum(
+    val accountId: String,
+    val name: String,
+    val albumArtist: String,
+    val artist: String = "",
+)
 @Serializable data class LibrarySmartPlaylist(val kind: String)
 @Serializable data class LibraryPlaylist(val slug: String)
 /**

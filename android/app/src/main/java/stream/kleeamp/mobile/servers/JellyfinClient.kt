@@ -203,6 +203,10 @@ class JellyfinClient(
                     duration = if (it.runTimeTicks > 0) (it.runTimeTicks / 10_000_000).toInt() else 0,
                     bitRate = it.bitRate,
                     suffix = it.container.orEmpty(),
+                    albumArtist = it.albumArtists.firstOrNull().orEmpty(),
+                    trackNo = it.indexNumber ?: 0,
+                    discNo = it.parentIndexNumber ?: 0,
+                    dateAdded = parseIsoEpochSeconds(it.dateCreated),
                 )
             }
         }
@@ -311,10 +315,14 @@ private data class JellyfinTrackItem(
     @SerialName("Id") val id: String = "",
     @SerialName("Name") val name: String = "",
     @SerialName("Artists") val artists: List<String> = emptyList(),
+    @SerialName("AlbumArtists") val albumArtists: List<String> = emptyList(),
     @SerialName("Album") val album: String = "",
     @SerialName("RunTimeTicks") val runTimeTicks: Long = 0L,
     @SerialName("BitRate") val bitRate: Int = 0,
     @SerialName("Container") val container: String = "",
+    @SerialName("IndexNumber") val indexNumber: Int? = null,
+    @SerialName("ParentIndexNumber") val parentIndexNumber: Int? = null,
+    @SerialName("DateCreated") val dateCreated: String? = null,
 )
 
 data class JellyfinAlbum(
@@ -335,4 +343,8 @@ data class JellyfinTrack(
     val duration: Int = 0,
     val bitRate: Int = 0,
     val suffix: String = "",
+    val albumArtist: String = "",
+    val trackNo: Int = 0,
+    val discNo: Int = 0,
+    val dateAdded: Long = 0,
 )

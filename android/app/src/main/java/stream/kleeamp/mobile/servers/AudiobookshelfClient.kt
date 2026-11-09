@@ -87,6 +87,7 @@ class AudiobookshelfClient(
                     album = meta?.albumTitle.orEmpty().ifBlank { meta?.title.orEmpty() },
                     duration = (f.duration ?: 0).toInt(),
                     codec = f.metadata?.ext.orEmpty(),
+                    albumArtist = meta?.authorName.orEmpty(),
                 )
             }
         }

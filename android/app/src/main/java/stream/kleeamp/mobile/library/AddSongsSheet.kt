@@ -92,6 +92,7 @@ fun AddSongsSheet(
         onDismiss = onDismiss,
         bodyFraction = 0.72f,
         scrollBody = false,
+        bodyGutter = 0.dp,
         header = {
             Row(
                 Modifier.fillMaxWidth().padding(vertical = 8.dp),

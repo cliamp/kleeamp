@@ -161,8 +161,11 @@ data class SubsonicTrack(
     val coverArt: String = "",
     val duration: Int = 0,
     val track: Int = 0,
+    val discNumber: Int = 0,
     val suffix: String = "",
     val bitRate: Int = 0,
+    /** Navidrome/OpenSubsonic addition timestamp, ISO-8601. */
+    val created: String = "",
 )
 
 @Serializable

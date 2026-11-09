@@ -39,20 +39,49 @@ data class ProviderTrack(
     val duration: Int = 0,
     val codec: String = "",
     val bitrate: Int = 0,
+    /** The album's artist when the server sends one; blank lets the account fill it. */
+    val albumArtist: String = "",
+    val trackNo: Int = 0,
+    val discNo: Int = 0,
+    /** When the track entered the server's library, epoch seconds; 0 when unknown. */
+    val dateAdded: Long = 0,
 )
 
-fun ProviderTrack.toStation(account: ProviderAccount, cover: String = ""): Station = Station(
+fun ProviderTrack.toStation(
+    account: ProviderAccount,
+    cover: String = "",
+    fallbackAlbum: String = "",
+    fallbackAlbumArtist: String = "",
+    fallbackTrackNo: Int = 0,
+    fallbackDiscNo: Int = 0,
+): Station = Station(
     id = "prov:${account.id}:$id",
     name = title.ifBlank { "untitled" },
     url = "${StreamResolver.PROVIDER_SCHEME}${account.id}/$id",
     source = StationSource.Provider,
-    artist = artist,
-    album = album,
+    artist = artist.ifBlank { fallbackAlbumArtist },
+    album = album.ifBlank { fallbackAlbum },
+    albumArtist = albumArtist.ifBlank { fallbackAlbumArtist },
+    trackNo = trackNo.takeIf { it > 0 } ?: fallbackTrackNo,
+    discNo = discNo.takeIf { it > 0 } ?: fallbackDiscNo,
     durationMs = duration * 1000L,
     codec = codec,
     bitrate = bitrate,
     cover = cover,
+    dateAdded = dateAdded,
 )
+
+/**
+ * Parses the ISO-8601 timestamps Subsonic and Jellyfin use for `created` /
+ * `DateCreated` into epoch seconds. Anything unreadable counts as unknown
+ * rather than failing the whole album load.
+ */
+internal fun parseIsoEpochSeconds(raw: String?): Long {
+    if (raw.isNullOrBlank()) return 0
+    return runCatching { java.time.OffsetDateTime.parse(raw).toEpochSecond() }
+        .recoverCatching { java.time.Instant.parse(raw).epochSecond }
+        .getOrDefault(0)
+}
 
 /**
  * The operations the browse screen needs from any provider. Each provider is a
@@ -111,14 +140,10 @@ private class SubsonicBrowseClient(
         }
 
     override suspend fun albumTracks(albumId: String): Result<List<ProviderTrack>> =
-        client.albumTracks(albumId).map { objs ->
-            objs.map { ProviderTrack(it.id, it.title, it.artist, it.album, it.duration, it.suffix, it.bitRate) }
-        }
+        client.albumTracks(albumId).map { objs -> objs.map { it.toProviderTrack() } }
 
     override suspend fun starred(): Result<List<ProviderTrack>> =
-        client.starred().map { objs ->
-            objs.map { ProviderTrack(it.id, it.title, it.artist, it.album, it.duration, it.suffix, it.bitRate) }
-        }
+        client.starred().map { objs -> objs.map { it.toProviderTrack() } }
 
     override fun trackCover(id: String): String = client.coverArtUrl(id)
 }
@@ -141,15 +166,40 @@ private class JellyfinBrowseClient(
         }
 
     override suspend fun albumTracks(albumId: String): Result<List<ProviderTrack>> =
-        client.albumTracks(albumId).map { objs ->
-            objs.map { ProviderTrack(it.id, it.title, it.artist, it.album, it.duration, it.suffix, it.bitRate) }
-        }
+        client.albumTracks(albumId).map { objs -> objs.map { it.toProviderTrack() } }
 
     override suspend fun starred(): Result<List<ProviderTrack>> =
         Result.success(emptyList())
 
     override fun trackCover(id: String): String = client.coverUrl(id)
 }
+
+private fun SubsonicTrack.toProviderTrack(): ProviderTrack = ProviderTrack(
+    id = id,
+    title = title,
+    artist = artist,
+    album = album,
+    duration = duration,
+    codec = suffix,
+    bitrate = bitRate,
+    trackNo = track,
+    discNo = discNumber,
+    dateAdded = parseIsoEpochSeconds(created),
+)
+
+private fun JellyfinTrack.toProviderTrack(): ProviderTrack = ProviderTrack(
+    id = id,
+    title = title,
+    artist = artist,
+    album = album,
+    duration = duration,
+    codec = suffix,
+    bitrate = bitRate,
+    albumArtist = albumArtist,
+    trackNo = trackNo,
+    discNo = discNo,
+    dateAdded = dateAdded,
+)
 
 private class PlexBrowseClient(
     private val client: PlexClient,
@@ -238,6 +288,8 @@ private class SftpBrowseClient(private val account: ProviderAccount) : ProviderB
                 // would mean opening every file on the server to find out.
                 duration = 0,
                 codec = it.ext,
+                trackNo = it.track,
+                dateAdded = it.mtime / 1000,
             )
         }
     }

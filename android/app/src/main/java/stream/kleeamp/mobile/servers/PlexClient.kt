@@ -122,10 +122,14 @@ class PlexClient(
                     // can rebuild a signed stream URL at play time.
                     id = part.firstOrNull()?.key.orEmpty().ifBlank { "/library/metadata/$albumId/unknown" },
                     title = t.title.orEmpty(),
-                    artist = t.grandparentTitle.orEmpty().ifBlank { t.originalTitle.orEmpty() },
+                    artist = t.originalTitle.orEmpty().ifBlank { t.grandparentTitle.orEmpty() },
                     album = t.parentTitle.orEmpty(),
                     duration = t.duration?.div(1000) ?: 0,
                     codec = part.firstOrNull()?.container.orEmpty(),
+                    albumArtist = t.grandparentTitle.orEmpty(),
+                    trackNo = t.index ?: 0,
+                    discNo = t.parentIndex ?: 0,
+                    dateAdded = t.addedAt ?: 0,
                 )
             }
         }
@@ -186,6 +190,9 @@ private data class TrackMeta(
     val grandparentTitle: String? = null,
     val originalTitle: String? = null,
     val duration: Int? = null,
+    val index: Int? = null,
+    val parentIndex: Int? = null,
+    val addedAt: Long? = null,
     @SerialName("Media") val media: List<MediaMeta> = emptyList(),
 )
 

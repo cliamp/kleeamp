@@ -80,6 +80,7 @@ fun StationsScreen(
     favorites: List<Station>,
     onPlay: (Station, List<Station>, QueueContinuation?) -> Unit,
     onAddToQueue: (Station) -> Unit = {},
+    onPlayNext: (Station) -> Unit = {},
     onAddToPlaylist: (Station) -> Unit = {},
     onOpenSearch: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
@@ -538,6 +539,7 @@ fun StationsScreen(
                             null
                         },
                         onQueue = if (liveChannel) null else ({ onAddToQueue(s) }),
+                        onPlayNext = if (liveChannel) null else ({ onPlayNext(s) }),
                         onToggleFavorite = { vm.onEvent(StationsViewModel.Event.ToggleFavorite(s)) },
                         onAddToPlaylist = { onAddToPlaylist(s) },
                     ),

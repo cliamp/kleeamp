@@ -48,6 +48,7 @@ fun LibraryAlbumPane(
     playing: Boolean,
     onPlay: (Station, List<Station>) -> Unit,
     onAddToQueue: (Station) -> Unit = {},
+    onPlayNext: (Station) -> Unit = {},
     onAddToPlaylist: (Station) -> Unit = {},
     onInfo: ((Station) -> Unit)? = null,
     onBack: () -> Unit,
@@ -157,6 +158,7 @@ fun LibraryAlbumPane(
                                 kind = MenuKind.STATION,
                                 favorite = fav,
                                 infoAvailable = info != null,
+                                onPlayNext = { onPlayNext(s) },
                                 onQueue = { onAddToQueue(s) },
                                 onToggleFavorite = {
                                     vm.onEvent(AlbumViewModel.Event.ToggleFavorite(s))

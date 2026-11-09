@@ -230,7 +230,7 @@ internal class QueueMediaBridge(
         window: List<Station>,
         index: Int,
         previousUpNext: List<Station>,
-        edit: ((MediaController) -> Unit)?,
+        edit: (suspend (MediaController) -> Unit)?,
     ) {
         swapping = controller() != null
         navJob = scope.launch(Dispatchers.Main + failureHandler) {
@@ -242,16 +242,23 @@ internal class QueueMediaBridge(
                 if (window.isEmpty()) {
                     c.clearMediaItems()
                 } else if (canEdit) {
-                    // Move/remove upcoming items without restarting the audible item.
+                    // Move/remove/insert upcoming items without restarting the
+                    // audible item.
                     edit(c)
                 } else {
-                    val position = if (c.currentMediaItem?.mediaId == window[index].id) c.currentPosition else 0L
+                    // Anchor the rebuild on what Media3 is actually playing:
+                    // the model index can lag a slow sync poll, and trusting it
+                    // here restarted or skipped the current song.
+                    val audibleId = c.currentMediaItem?.mediaId
+                    val live = window.indexOfFirst { it.id == audibleId }
+                    val at = (if (live >= 0) live else index).coerceIn(0, window.lastIndex)
+                    val position = if (live >= 0) c.currentPosition else 0L
                     if (window.size > 1 && window.all { it.isTrack }) {
                         val items = window.map { buildItem(it) }
-                        c.setMediaItems(items, index, position)
+                        c.setMediaItems(items, at, position)
                         c.prepare()
-                    } else if (c.mediaItemCount != 1 || c.currentMediaItem?.mediaId != window[index].id) {
-                        c.setMediaItems(listOf(buildItem(window[index])), 0, position)
+                    } else if (c.mediaItemCount != 1 || c.currentMediaItem?.mediaId != window[at].id) {
+                        c.setMediaItems(listOf(buildItem(window[at])), 0, position)
                         c.prepare()
                     }
                 }

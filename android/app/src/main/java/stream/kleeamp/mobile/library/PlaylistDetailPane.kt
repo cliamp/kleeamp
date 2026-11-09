@@ -181,6 +181,7 @@ fun LibraryPlaylistPane(
     onOpenSettings: () -> Unit = {},
     onAddToPlaylist: (Station) -> Unit = {},
     onAddToQueue: (Station) -> Unit = {},
+    onPlayNext: (Station) -> Unit = {},
     onInfo: ((Station) -> Unit)? = null,
     onOpenArtist: (String, String) -> Unit = { _, _ -> },
     /** Opens the add-songs sheet over this page; the sheet writes per tap. */
@@ -314,6 +315,7 @@ fun LibraryPlaylistPane(
                                     "remove from this playlist",
                                     { vm.onEvent(PlaylistDetailViewModel.Event.RemoveMember(s)) },
                                 ),
+                                onPlayNext = { onPlayNext(s) },
                                 onQueue = { onAddToQueue(s) },
                                 onToggleFavorite = {
                                     vm.onEvent(PlaylistDetailViewModel.Event.ToggleFavorite(s))

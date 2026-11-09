@@ -115,6 +115,7 @@ fun ProviderSongsPane(
     playing: Boolean,
     onPlay: (Station, List<Station>) -> Unit,
     onAddToQueue: (Station) -> Unit = {},
+    onPlayNext: (Station) -> Unit = {},
     onAddToPlaylist: (Station) -> Unit = {},
     onInfo: ((Station) -> Unit)? = null,
     onBack: () -> Unit,
@@ -407,6 +408,7 @@ fun ProviderSongsPane(
                             kind = MenuKind.STATION,
                             favorite = fav,
                             infoAvailable = fav,
+                            onPlayNext = { onPlayNext(s) },
                             onQueue = { onAddToQueue(s) },
                             onToggleFavorite = {
                                 vm.onEvent(ProviderSongsViewModel.Event.ToggleFavorite(s))

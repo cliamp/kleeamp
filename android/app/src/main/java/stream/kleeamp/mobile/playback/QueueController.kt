@@ -734,12 +734,20 @@ internal class QueueController(
         }
     }
 
+    /** Re-anchor the model on Media3's live item, which can lead the slow sync poll. */
+    private fun anchorIndexOnAudible() {
+        val audibleId = controller()?.currentMediaItem?.mediaId ?: return
+        val live = model.currentUpNext.indexOfFirst { it.id == audibleId }
+        if (live >= 0 && live != model.currentIndex) model.setIndex(live)
+    }
+
     /** Apply a window edit without losing the unloaded continuation of a long list. */
     private fun applyUpNextToPlayer(
         previousUpNext: List<Station>,
-        edit: ((MediaController) -> Unit)? = null,
+        edit: (suspend (MediaController) -> Unit)? = null,
     ) {
         cancelPendingPlayback()
+        anchorIndexOnAudible()
         val q = model.currentUpNext
         model.ringFallback = false
         val idx = if (q.isEmpty()) -1 else model.currentIndex.coerceIn(0, q.lastIndex)
@@ -756,6 +764,9 @@ internal class QueueController(
 
     /** Insert without changing the originating list. Append means the full tail, not just its window. */
     fun addToUpNext(station: Station, at: Int = Int.MAX_VALUE) {
+        // Play Next means "after the track I can hear", not after a model
+        // index that the slow sync poll has not caught up with yet.
+        anchorIndexOnAudible()
         snapshotForUndo()
         val previous = model.currentUpNext
         if (at == Int.MAX_VALUE && model.windowBase + previous.size < model.source.size) {
@@ -770,7 +781,23 @@ internal class QueueController(
         }
         val inserted = QueuePolicy.insert(previous, at, model.currentIndex, station)
         model.setWindow(inserted.queue, inserted.currentIndex)
-        applyUpNextToPlayer(previous)
+        // Play Next inserts in place: adding the item after the live audible
+        // one keeps the current decoder running, where a full window rebuild
+        // re-prepares (and can restart) the song already playing.
+        val insertAfterCurrent: (suspend (MediaController) -> Unit)? =
+            if (at != Int.MAX_VALUE) {
+                {
+                    if (it.mediaItemCount == 0) {
+                        it.addMediaItem(buildItem(station))
+                    } else {
+                        val live = it.currentMediaItemIndex.coerceIn(0, it.mediaItemCount - 1)
+                        it.addMediaItem(live + 1, buildItem(station))
+                    }
+                }
+            } else {
+                null
+            }
+        applyUpNextToPlayer(previous, insertAfterCurrent)
     }
 
     /** Insert [station] right after the currently-playing item (play next). */

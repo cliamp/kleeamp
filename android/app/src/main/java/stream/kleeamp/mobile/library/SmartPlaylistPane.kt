@@ -126,6 +126,7 @@ fun LibrarySmartPlaylistPane(
     playing: Boolean,
     onPlay: (Station, List<Station>) -> Unit,
     onAddToQueue: (Station) -> Unit = {},
+    onPlayNext: (Station) -> Unit = {},
     favScope: FavScope = FavScope.All,
     onFavScopeChange: (FavScope) -> Unit = {},
     onOpenSongInfo: (Station) -> Unit = {},
@@ -316,6 +317,7 @@ fun LibrarySmartPlaylistPane(
                             )
                             else -> null
                         },
+                        onPlayNext = { onPlayNext(s) },
                         onQueue = { onAddToQueue(s) },
                         onToggleFavorite = {
                             vm.onEvent(SmartPlaylistViewModel.Event.ToggleFavorite(s))

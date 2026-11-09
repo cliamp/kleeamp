@@ -56,6 +56,7 @@ fun LibraryArtistPane(
     playing: Boolean,
     onPlay: (Station, List<Station>) -> Unit,
     onAddToQueue: (Station) -> Unit = {},
+    onPlayNext: (Station) -> Unit = {},
     onAddToPlaylist: (Station) -> Unit = {},
     onInfo: ((Station) -> Unit)? = null,
     onOpenAlbum: (String, String) -> Unit = { _, _ -> },
@@ -209,6 +210,7 @@ fun LibraryArtistPane(
                                 kind = MenuKind.STATION,
                                 favorite = fav,
                                 infoAvailable = info != null,
+                                onPlayNext = { onPlayNext(s) },
                                 onQueue = { onAddToQueue(s) },
                                 onToggleFavorite = {
                                     vm.onEvent(ArtistViewModel.Event.ToggleFavorite(s))
